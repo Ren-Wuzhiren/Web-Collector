@@ -29,6 +29,12 @@ public class Link {
     // [业务] 用户粘贴进来的原始地址，原样保存，这一轮不做任何规范化。
     private String originalUrl;
 
+    // [业务] 用于展示和回看用户实际提交的地址，不覆盖成规范化结果。
+    private String normalizedUrl;
+
+    // [业务] 对规范化 URL 做 SHA-256，配合 user_id 唯一索引完成快速去重。
+    private String urlHash;
+
     // [Java] 非空列在 Java 侧用空串表达"未填写"，与 DDL 的 DEFAULT '' 对齐。
     private String title;
 
@@ -69,6 +75,22 @@ public class Link {
 
     public void setOriginalUrl(String originalUrl) {
         this.originalUrl = originalUrl;
+    }
+
+    public String getNormalizedUrl() {
+        return normalizedUrl;
+    }
+
+    public void setNormalizedUrl(String normalizedUrl) {
+        this.normalizedUrl = normalizedUrl;
+    }
+
+    public String getUrlHash() {
+        return urlHash;
+    }
+
+    public void setUrlHash(String urlHash) {
+        this.urlHash = urlHash;
     }
 
     public String getTitle() {

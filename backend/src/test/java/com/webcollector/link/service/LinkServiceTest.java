@@ -1,5 +1,6 @@
 package com.webcollector.link.service;
 
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.webcollector.auth.session.SessionTokenService;
 import com.webcollector.collection.mapper.LinkCollectionMapper;
@@ -11,12 +12,14 @@ import com.webcollector.link.dto.SetLinkTagsRequest;
 import com.webcollector.link.dto.UpdateLinkRequest;
 import com.webcollector.link.entity.Link;
 import com.webcollector.link.mapper.LinkMapper;
+import com.webcollector.link.support.UrlNormalizer;
 import com.webcollector.tag.entity.LinkTag;
 import com.webcollector.tag.mapper.LinkTagMapper;
 import com.webcollector.tag.mapper.TagMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.dao.DuplicateKeyException;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -56,6 +59,12 @@ public class LinkServiceTest {
 
     @BeforeEach
     void setUp() {
+        // [测试] 初始化 Lambda Wrapper 所需的 Mapper 元数据。
+        // 这样 Service 单测不依赖集成测试预先加载 Spring 容器。
+        MybatisConfiguration mybatisConfiguration = new MybatisConfiguration();
+        mybatisConfiguration.addMapper(LinkCollectionMapper.class);
+        mybatisConfiguration.addMapper(TagMapper.class);
+
         linkMapper = mock(LinkMapper.class);
         linkCollectionMapper = mock(LinkCollectionMapper.class);
         sessionTokenService = mock(SessionTokenService.class);
@@ -126,6 +135,10 @@ public class LinkServiceTest {
         Link inserted = captor.getValue();
         assertThat(inserted.getUserId()).isEqualTo(1L);
         assertThat(inserted.getCollectionId()).isEqualTo(5L);
+        assertThat(inserted.getOriginalUrl()).isEqualTo("https://example.com/a");
+        assertThat(inserted.getNormalizedUrl()).isEqualTo("https://example.com/a");
+        assertThat(inserted.getUrlHash())
+                .isEqualTo(UrlNormalizer.sha256("https://example.com/a"));
         assertThat(inserted.getTitle()).isEqualTo("示例标题");
         assertThat(inserted.getDescription()).isEqualTo("示例描述");
         assertThat(inserted.getCreatedAt()).isEqualTo(FIXED_TIME);
@@ -156,8 +169,31 @@ public class LinkServiceTest {
         Link inserted = captor.getValue();
         assertThat(inserted.getOriginalUrl())
                 .isEqualTo("https://example.com/a");
+        assertThat(inserted.getNormalizedUrl())
+                .isEqualTo("https://example.com/a");
         assertThat(inserted.getTitle()).isEmpty();
         assertThat(inserted.getDescription()).isEmpty();
+    }
+
+    // [测试意图] 验证数据库唯一键冲突被转换为稳定的 LINK_ALREADY_EXISTS 业务错误。
+    @Test
+    void shouldTranslateDuplicateUrlKeyToBusinessConflict() {
+        when(linkCollectionMapper.selectCount(any())).thenReturn(1L);
+        when(linkMapper.insert(any(Link.class)))
+                .thenThrow(new DuplicateKeyException("duplicate URL"));
+
+        assertThatThrownBy(() -> linkService.createLink(new CreateLinkRequest(
+                "https://example.com/a",
+                5L,
+                List.of(),
+                "",
+                ""
+        )))
+                .isInstanceOfSatisfying(
+                        BusinessException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.LINK_ALREADY_EXISTS)
+                );
     }
 
     // [测试意图] 验证往别人的集合里存链接返回 404，且不执行插入。
@@ -491,6 +527,8 @@ public class LinkServiceTest {
         link.setUserId(1L);
         link.setCollectionId(collectionId);
         link.setOriginalUrl(url);
+        link.setNormalizedUrl(UrlNormalizer.normalize(url));
+        link.setUrlHash(UrlNormalizer.sha256(link.getNormalizedUrl()));
         link.setTitle("");
         link.setDescription("");
         link.setCreatedAt(OLDER_TIME);

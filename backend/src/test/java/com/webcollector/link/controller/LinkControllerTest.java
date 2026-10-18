@@ -121,6 +121,24 @@ public class LinkControllerTest {
         assertThat(captor.getValue().collectionId()).isEqualTo(5L);
     }
 
+    // [测试意图] 验证重复链接业务异常通过 HTTP 边界返回 409 和稳定错误码。
+    @Test
+    void shouldReturnConflictWhenLinkAlreadyExists() throws Exception {
+        when(linkService.createLink(any(CreateLinkRequest.class)))
+                .thenThrow(new BusinessException(ErrorCode.LINK_ALREADY_EXISTS));
+
+        mockMvc.perform(post("/api/v1/links")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "url": "https://example.com/a",
+                                  "collectionId": 5
+                                }
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("LINK_ALREADY_EXISTS"));
+    }
+
     // [测试意图] 验证地址为空时在 HTTP 边界就被挡下，不会调用 Service。
     @Test
     void shouldReturnBadRequestWhenUrlIsBlank() throws Exception {

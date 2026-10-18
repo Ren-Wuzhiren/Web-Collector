@@ -13,6 +13,7 @@ public enum ErrorCode {
         FORBIDDEN                   403
         NOT_FOUND                   404
         CONFLICT                    409
+        LINK_ALREADY_EXISTS         409
         INTERNAL_ERROR              500
         SERVICE_UNAVAILABLE         503
     */
@@ -33,6 +34,7 @@ public enum ErrorCode {
     COLLECTION_INBOX_PROTECTED(HttpStatus.CONFLICT, "默认 Inbox 不允许删除"),
     TAG_NAME_ALREADY_EXISTS(HttpStatus.CONFLICT, "标签名称已存在"),
     COLLECTION_NOT_EMPTY(HttpStatus.CONFLICT, "集合中还有链接"),
+    LINK_ALREADY_EXISTS(HttpStatus.CONFLICT, "该链接已经保存"),
     SERVICE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "服务暂时不可用");
 
     private final HttpStatus status;

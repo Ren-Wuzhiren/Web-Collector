@@ -8,6 +8,7 @@ import com.webcollector.collection.entity.LinkCollection;
 import com.webcollector.collection.mapper.LinkCollectionMapper;
 import com.webcollector.link.entity.Link;
 import com.webcollector.link.mapper.LinkMapper;
+import com.webcollector.link.support.UrlNormalizer;
 import com.webcollector.support.SharedTestContainers;
 import com.webcollector.tag.entity.LinkTag;
 import com.webcollector.tag.entity.Tag;
@@ -214,6 +215,8 @@ public class LinkTagMapperTest {
         link.setUserId(userId);
         link.setCollectionId(collectionId);
         link.setOriginalUrl(url);
+        link.setNormalizedUrl(UrlNormalizer.normalize(url));
+        link.setUrlHash(UrlNormalizer.sha256(link.getNormalizedUrl()));
         link.setTitle("");
         link.setDescription("");
         link.setCreatedAt(now);

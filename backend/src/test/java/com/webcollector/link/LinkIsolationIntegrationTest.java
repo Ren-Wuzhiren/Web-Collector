@@ -76,6 +76,49 @@ public class LinkIsolationIntegrationTest {
                         .value("https://b.example.com/1"));
     }
 
+    // [测试意图] 验证等价 URL 对同一用户返回 409，但其他用户仍可保存该地址。
+    @Test
+    void shouldRejectNormalizedDuplicateOnlyForSameUser() throws Exception {
+        String aliceToken = registerAndLogin("link-dedup-alice");
+        String bobToken = registerAndLogin("link-dedup-bob");
+        long aliceInboxId = defaultInboxId(aliceToken);
+        long bobInboxId = defaultInboxId(bobToken);
+
+        saveLink(
+                aliceToken,
+                aliceInboxId,
+                "HTTPS://Example.COM:443#first"
+        );
+
+        mockMvc.perform(post("/api/v1/links")
+                        .header("Authorization", "Bearer " + aliceToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "url": "https://example.com/",
+                                  "collectionId": %d
+                                }
+                                """.formatted(aliceInboxId)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("LINK_ALREADY_EXISTS"));
+
+        mockMvc.perform(post("/api/v1/links")
+                        .header("Authorization", "Bearer " + bobToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "url": "https://example.com/",
+                                  "collectionId": %d
+                                }
+                                """.formatted(bobInboxId)))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/v1/links")
+                        .header("Authorization", "Bearer " + aliceToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1));
+    }
+
     // [测试意图] 验证 A 既读不到、也改不掉、更删不掉 B 的链接，且 B 的链接完好无损。
     @Test
     void shouldNotReadModifyOrDeleteOtherUsersLink() throws Exception {

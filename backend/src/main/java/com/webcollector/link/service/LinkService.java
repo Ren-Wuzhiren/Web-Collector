@@ -12,10 +12,12 @@ import com.webcollector.link.dto.SetLinkTagsRequest;
 import com.webcollector.link.dto.UpdateLinkRequest;
 import com.webcollector.link.entity.Link;
 import com.webcollector.link.mapper.LinkMapper;
+import com.webcollector.link.support.UrlNormalizer;
 import com.webcollector.tag.entity.LinkTag;
 import com.webcollector.tag.entity.Tag;
 import com.webcollector.tag.mapper.LinkTagMapper;
 import com.webcollector.tag.mapper.TagMapper;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -70,6 +72,9 @@ public class LinkService {
 
     @Transactional
     public LinkSummary createLink(CreateLinkRequest request) {
+        String normalizedUrl = UrlNormalizer.normalize(request.url());
+        String urlHash = UrlNormalizer.sha256(normalizedUrl);
+
         Long userId = currentUserId();
 
         // [业务] collectionId 是客户端传进来的，必须确认它属于当前用户，
@@ -86,14 +91,19 @@ public class LinkService {
 
         link.setCollectionId(request.collectionId());
         link.setOriginalUrl(request.url());
+        link.setNormalizedUrl(normalizedUrl);
+        link.setUrlHash(urlHash);
         link.setTitle(request.title());
         link.setDescription(request.description());
         link.setCreatedAt(now);
         link.setUpdatedAt(now);
 
-        // [业务] 这一轮不接 DuplicateKeyException：link 表还没有任何唯一约束，
-        // 重复地址的 409 翻译等 M2.5 加了 uk_link_user_url 再补。
-        linkMapper.insert(link);
+        // [业务] 唯一索引负责并发安全；这里只把该索引冲突翻译成稳定的 409 契约。
+        try {
+            linkMapper.insert(link);
+        } catch (DuplicateKeyException exception) {
+            throw new BusinessException(ErrorCode.LINK_ALREADY_EXISTS);
+        }
 
         // [业务] 关联写在链接插入之后、同一个事务里：要么链接和标签一起成功，
         // 要么一起回滚，不会留下"链接存了但标签丢了"的半截状态。

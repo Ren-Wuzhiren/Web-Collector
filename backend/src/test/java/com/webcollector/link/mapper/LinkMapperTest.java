@@ -5,6 +5,7 @@ import com.webcollector.auth.mapper.AppUserMapper;
 import com.webcollector.collection.entity.LinkCollection;
 import com.webcollector.collection.mapper.LinkCollectionMapper;
 import com.webcollector.link.entity.Link;
+import com.webcollector.link.support.UrlNormalizer;
 import com.webcollector.support.SharedTestContainers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -76,6 +77,10 @@ public class LinkMapperTest {
         assertThat(loaded.getCollectionId()).isEqualTo(collection.getId());
         assertThat(loaded.getOriginalUrl())
                 .isEqualTo("https://example.com/a");
+        assertThat(loaded.getNormalizedUrl())
+                .isEqualTo("https://example.com/a");
+        assertThat(loaded.getUrlHash())
+                .isEqualTo(UrlNormalizer.sha256("https://example.com/a"));
         assertThat(loaded.getTitle()).isEmpty();
         assertThat(loaded.getDescription()).isEmpty();
         assertThat(loaded.getCreatedAt()).isEqualTo(now);
@@ -176,11 +181,9 @@ public class LinkMapperTest {
         assertThat(linkMapper.selectById(link.getId())).isNull();
     }
 
-    // [测试意图] 钉住当前边界：link 表还没有唯一约束，同一用户可以把同一地址存两次。
-    // [业务] 这正是 M2.5「让重复地址被认出来」要改掉的行为。等 uk_link_user_url 落地后，
-    // 这条测试会失败，那时改成断言 DataIntegrityViolationException——失败即是提醒。
+    // [测试意图] 验证 URL 哈希在用户范围内唯一，同一地址可由不同用户分别保存。
     @Test
-    void shouldAllowDuplicateOriginalUrlForSameUser() {
+    void shouldEnforceUrlHashUniquenessPerUser() {
         AppUser owner = newUser("link-duplicate-url-owner");
         LinkCollection collection = newCollection(owner.getId());
         LocalDateTime now = now();
@@ -199,8 +202,19 @@ public class LinkMapperTest {
         );
 
         assertThat(linkMapper.insert(first)).isEqualTo(1);
-        assertThat(linkMapper.insert(second)).isEqualTo(1);
-        assertThat(first.getId()).isNotEqualTo(second.getId());
+        assertThatThrownBy(() -> linkMapper.insert(second))
+                .isInstanceOf(DataIntegrityViolationException.class);
+
+        AppUser anotherOwner = newUser("link-duplicate-url-other-owner");
+        LinkCollection anotherCollection = newCollection(anotherOwner.getId());
+        Link sameUrlForAnotherOwner = newLink(
+                anotherOwner.getId(),
+                anotherCollection.getId(),
+                "https://example.com/a",
+                now
+        );
+
+        assertThat(linkMapper.insert(sameUrlForAnotherOwner)).isEqualTo(1);
     }
 
     private AppUser newUser(String username) {
@@ -242,6 +256,8 @@ public class LinkMapperTest {
         link.setUserId(userId);
         link.setCollectionId(collectionId);
         link.setOriginalUrl(url);
+        link.setNormalizedUrl(UrlNormalizer.normalize(url));
+        link.setUrlHash(UrlNormalizer.sha256(link.getNormalizedUrl()));
         link.setTitle("");
         link.setDescription("");
         link.setCreatedAt(now);
