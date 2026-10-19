@@ -39,7 +39,9 @@ JWT 不作为第一版必需依赖；如果需要学习 JWT，应在鉴权闭环
 ## 目录
 
 ```text
+PROJECT.md               # 本项目背景、技术栈与当前阶段卡
 AGENTS.md                 # 协作与学习规范
+new_stantard/              # 当前采用的 agent-kit 与 prompt-system 标准来源
 docs/                     # 需求、研读、工程化、复盘和四大件笔记
 reference/linkwarden/     # 上游参考源码，本地克隆且不提交
 backend/                  # Java 后端，业务代码由用户亲手实现
@@ -53,6 +55,11 @@ Linkwarden 使用 AGPL-3.0。参考源码仅用于理解问题、架构和设计
 
 ## 文档入口
 
+- [项目卡](PROJECT.md)
+- [当前协作规范](AGENTS.md)
+- [Agent Kit](new_stantard/agent-kit/README.md)
+- [Prompt System](new_stantard/prompt-system/README.md)
+- [新协作模式说明与回滚记录](docs/需求文档/2026-10-19-008-协作模式升级与旧模式归档.md)
 - [需求与总体方案](docs/需求文档/2026-09-12-001-项目总体方案与第一版范围.md)
 - [Linkwarden 源码研读](docs/源码研读/README.md)
 - [技术选型与架构](docs/工程化文档/04-技术选型与架构.md)
