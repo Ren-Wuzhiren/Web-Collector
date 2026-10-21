@@ -3,10 +3,14 @@ package com.webcollector.link.service;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.webcollector.auth.session.SessionTokenService;
+import com.webcollector.capture.dto.CaptureJobSummary;
+import com.webcollector.capture.entity.CaptureJobStatus;
+import com.webcollector.capture.service.CaptureJobService;
 import com.webcollector.collection.mapper.LinkCollectionMapper;
 import com.webcollector.common.web.BusinessException;
 import com.webcollector.common.web.ErrorCode;
 import com.webcollector.link.dto.CreateLinkRequest;
+import com.webcollector.link.dto.LinkCreationResponse;
 import com.webcollector.link.dto.LinkSummary;
 import com.webcollector.link.dto.SetLinkTagsRequest;
 import com.webcollector.link.dto.UpdateLinkRequest;
@@ -54,6 +58,7 @@ public class LinkServiceTest {
     private LinkCollectionMapper linkCollectionMapper;
     private TagMapper tagMapper;
     private LinkTagMapper linkTagMapper;
+    private CaptureJobService captureJobService;
     private SessionTokenService sessionTokenService;
     private LinkService linkService;
 
@@ -70,6 +75,7 @@ public class LinkServiceTest {
         sessionTokenService = mock(SessionTokenService.class);
         tagMapper = mock(TagMapper.class);
         linkTagMapper = mock(LinkTagMapper.class);
+        captureJobService = mock(CaptureJobService.class);
 
         Clock clock = Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC);
 
@@ -78,6 +84,7 @@ public class LinkServiceTest {
                 linkCollectionMapper,
                 tagMapper,
                 linkTagMapper,
+                captureJobService,
                 sessionTokenService,
                 clock
         );
@@ -112,8 +119,17 @@ public class LinkServiceTest {
             inserted.setId(20L);
             return 1;
         });
+        CaptureJobSummary expectedJob = new CaptureJobSummary(
+                30L,
+                20L,
+                CaptureJobStatus.PENDING,
+                0,
+                FIXED_INSTANT
+        );
+        when(captureJobService.createPending(20L, 1L, FIXED_TIME))
+                .thenReturn(expectedJob);
 
-        LinkSummary summary = linkService.createLink(
+        LinkCreationResponse response = linkService.createLink(
                 new CreateLinkRequest(
                         "https://example.com/a",
                         5L,
@@ -123,11 +139,13 @@ public class LinkServiceTest {
                 )
         );
 
-        assertThat(summary.id()).isEqualTo(20L);
-        assertThat(summary.collectionId()).isEqualTo(5L);
-        assertThat(summary.originalUrl())
+        assertThat(response.link().id()).isEqualTo(20L);
+        assertThat(response.link().collectionId()).isEqualTo(5L);
+        assertThat(response.link().originalUrl())
                 .isEqualTo("https://example.com/a");
-        assertThat(summary.createdAt()).isEqualTo(FIXED_INSTANT);
+        assertThat(response.link().createdAt()).isEqualTo(FIXED_INSTANT);
+        assertThat(response.job()).isEqualTo(expectedJob);
+        verify(captureJobService).createPending(20L, 1L, FIXED_TIME);
 
         ArgumentCaptor<Link> captor = ArgumentCaptor.forClass(Link.class);
         verify(linkMapper).insert(captor.capture());
@@ -194,6 +212,10 @@ public class LinkServiceTest {
                         exception -> assertThat(exception.getErrorCode())
                                 .isEqualTo(ErrorCode.LINK_ALREADY_EXISTS)
                 );
+
+        // [业务] 唯一键在插入链接时就冲突，不能继续创建对应抓取任务。
+        verify(captureJobService, never())
+                .createPending(any(), any(), any());
     }
 
     // [测试意图] 验证往别人的集合里存链接返回 404，且不执行插入。

@@ -4,7 +4,10 @@ import com.webcollector.common.web.BusinessException;
 import com.webcollector.common.web.ErrorCode;
 import com.webcollector.common.web.GlobalExceptionHandler;
 import com.webcollector.common.web.RequestIdFilter;
+import com.webcollector.capture.dto.CaptureJobSummary;
+import com.webcollector.capture.entity.CaptureJobStatus;
 import com.webcollector.link.dto.CreateLinkRequest;
+import com.webcollector.link.dto.LinkCreationResponse;
 import com.webcollector.link.dto.LinkSummary;
 import com.webcollector.link.dto.SetLinkTagsRequest;
 import com.webcollector.link.dto.UpdateLinkRequest;
@@ -88,7 +91,16 @@ public class LinkControllerTest {
     @Test
     void shouldCreateLinkWhenRequestIsValid() throws Exception {
         when(linkService.createLink(any(CreateLinkRequest.class)))
-                .thenReturn(summary(3L, "https://example.com/a"));
+                .thenReturn(new LinkCreationResponse(
+                        summary(3L, "https://example.com/a"),
+                        new CaptureJobSummary(
+                                30L,
+                                3L,
+                                CaptureJobStatus.PENDING,
+                                0,
+                                FIXED_INSTANT
+                        )
+                ));
 
         mockMvc.perform(post("/api/v1/links")
                         .header(
@@ -105,7 +117,15 @@ public class LinkControllerTest {
                                 }
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.data.id").value(3))
+                .andExpect(jsonPath("$.data.link.id").value(3))
+                .andExpect(jsonPath("$.data.link.originalUrl")
+                        .value("https://example.com/a"))
+                .andExpect(jsonPath("$.data.job.id").value(30))
+                .andExpect(jsonPath("$.data.job.linkId").value(3))
+                .andExpect(jsonPath("$.data.job.status").value("PENDING"))
+                .andExpect(jsonPath("$.data.job.attemptCount").value(0))
+                .andExpect(jsonPath("$.data.job.nextAttemptAt")
+                        .value("2026-10-15T12:00:00Z"))
                 .andExpect(jsonPath("$.message")
                         .value("链接保存成功"))
                 .andExpect(jsonPath("$.requestId")

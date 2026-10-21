@@ -2,6 +2,9 @@ package com.webcollector.link.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.webcollector.auth.session.SessionTokenService;
+import com.webcollector.capture.dto.CaptureJobSummary;
+import com.webcollector.capture.service.CaptureJobService;
+import com.webcollector.link.dto.LinkCreationResponse;
 import com.webcollector.collection.entity.LinkCollection;
 import com.webcollector.collection.mapper.LinkCollectionMapper;
 import com.webcollector.common.web.BusinessException;
@@ -34,6 +37,7 @@ public class LinkService {
     private final LinkCollectionMapper linkCollectionMapper;
     private final TagMapper tagMapper;
     private final LinkTagMapper linkTagMapper;
+    private final CaptureJobService captureJobService;
     private final SessionTokenService sessionTokenService;
     private final Clock clock;
 
@@ -42,6 +46,7 @@ public class LinkService {
             LinkCollectionMapper linkCollectionMapper,
             TagMapper tagMapper,
             LinkTagMapper linkTagMapper,
+            CaptureJobService captureJobService,
             SessionTokenService sessionTokenService,
             Clock clock
     ) {
@@ -49,6 +54,7 @@ public class LinkService {
         this.linkCollectionMapper = linkCollectionMapper;
         this.tagMapper = tagMapper;
         this.linkTagMapper = linkTagMapper;
+        this.captureJobService = captureJobService;
         this.sessionTokenService = sessionTokenService;
         this.clock = clock;
     }
@@ -70,8 +76,14 @@ public class LinkService {
                 .toList();
     }
 
+    /**
+     * [业务] 保存一条链接：写链接、写标签关联、再排一条 PENDING 抓取任务。
+     *
+     * [软件工程] 三步在同一个事务里——任何一步失败，另外两步一起回滚。
+     * 响应同时带回 link 与 job，客户端不用再发一次请求问"任务建了没"。
+     */
     @Transactional
-    public LinkSummary createLink(CreateLinkRequest request) {
+    public LinkCreationResponse createLink(CreateLinkRequest request) {
         String normalizedUrl = UrlNormalizer.normalize(request.url());
         String urlHash = UrlNormalizer.sha256(normalizedUrl);
 
@@ -109,7 +121,11 @@ public class LinkService {
         // 要么一起回滚，不会留下"链接存了但标签丢了"的半截状态。
         attachTags(link.getId(), tagIds, now);
 
-        return toSummary(link);
+        // [业务] 任务也写在同一个事务里：job 插入失败时，链接和标签关联一起回滚，
+        // 不会留下"保存成功但永远不会被采集"的孤儿链接。
+        CaptureJobSummary job = captureJobService.createPending(link.getId(), userId, now);
+
+        return new LinkCreationResponse(toSummary(link), job);
     }
 
     @Transactional(readOnly = true)

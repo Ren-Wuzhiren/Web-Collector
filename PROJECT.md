@@ -6,9 +6,9 @@
 
 ## 当前阶段
 
-- 阶段：M2.6 阶段卡已起草，待确认范围与任务服务边界。
-- 上次完成：M2.5 URL 规范化与重复检测；提交 `6b28c22`。
-- 本轮只做：确认 M2.6 的阶段卡，随后由用户实现后端生产代码、Codex 编写测试并验收。
+- 阶段：M2.6 工程实现与自动化验收完成；阶段卡中的两道学习题待用户回答。
+- 上次完成：M2.6 保存链接时创建 PENDING 抓取任务。
+- 本轮完成：用户实现 M2.6 后端生产代码，Codex 完成第四批测试、代码审查和文档同步；`mvn -pl backend test` 212 项通过。
 - 本轮不做：Worker 抢占/状态机、自动重试、抓取引擎、资产存储、搜索、前端和部署。
 
 ## 技术栈与版本
@@ -49,9 +49,9 @@ reference/linkwarden/                   本地上游参考，只读且不提交
 
 ## 核心数据与接口
 
-- 已落地表：`app_user`、`collection`、`tag`、`link`、`link_tag`。
+- 已落地表：`app_user`、`collection`、`tag`、`link`、`link_tag`、`capture_job`。
 - 核心接口：注册/登录；集合、标签、链接 CRUD；链接标签关联。
-- `POST /api/v1/links` 当前完成 M2.5，M2.6 计划在事务中同时创建链接与 `PENDING capture_job`。
+- `POST /api/v1/links` 已完成 M2.6：在同一事务中创建链接、标签关联与 `PENDING capture_job`，响应包含 `{link, job}`。
 - 鉴权：`Authorization: Bearer <token>`。
 
 ## 完成定义

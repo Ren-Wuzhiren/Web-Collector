@@ -6,6 +6,7 @@ import com.webcollector.link.dto.LinkSummary;
 import com.webcollector.link.dto.SetLinkTagsRequest;
 import com.webcollector.link.dto.UpdateLinkRequest;
 import com.webcollector.link.service.LinkService;
+import com.webcollector.link.dto.LinkCreationResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -42,8 +43,9 @@ public class LinkController {
     }
 
     // [业务] 创建成功返回 201 而不是 200，让客户端能明确区分"新建了资源"。
+    // [业务] data 从单个 link 变成 {link, job}，客户端一次拿到"存好了"和"排队了"两件事。
     @PostMapping
-    public ResponseEntity<ApiResponse<LinkSummary>> createLink(
+    public ResponseEntity<ApiResponse<LinkCreationResponse>> createLink(
             @Valid @RequestBody CreateLinkRequest request
     ) {
         return ResponseEntity

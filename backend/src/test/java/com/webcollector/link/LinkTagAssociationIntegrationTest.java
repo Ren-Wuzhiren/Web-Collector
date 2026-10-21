@@ -253,7 +253,7 @@ public class LinkTagAssociationIntegrationTest {
                 .getResponse()
                 .getContentAsString();
 
-        Number id = JsonPath.read(body, "$.data.id");
+        Number id = JsonPath.read(body, "$.data.link.id");
         return id.longValue();
     }
 
