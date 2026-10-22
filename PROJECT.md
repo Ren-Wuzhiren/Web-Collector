@@ -49,6 +49,7 @@ reference/linkwarden/                   本地上游参考，只读且不提交
 
 ## 核心数据与接口
 
+- 项目阶段总览：[docs/项目阶段说明.md](docs/项目阶段说明.md)。
 - 已落地表：`app_user`、`collection`、`tag`、`link`、`link_tag`、`capture_job`。
 - 核心接口：注册/登录；集合、标签、链接 CRUD；链接标签关联。
 - `POST /api/v1/links` 已完成 M2.6：在同一事务中创建链接、标签关联与 `PENDING capture_job`，响应包含 `{link, job}`。
