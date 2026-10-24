@@ -22,9 +22,22 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -58,6 +71,9 @@ class CaptureJobServiceTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private DataSource dataSource;
+
     @BeforeEach
     void cleanUp() {
         // [业务] app_user 是所有权根，删它会把集合、链接、任务一起级联清掉。
@@ -76,6 +92,7 @@ class CaptureJobServiceTest {
 
         CaptureJob loaded = captureJobMapper.selectById(jobId);
         assertThat(loaded.getStatus()).isEqualTo(CaptureJobStatus.RUNNING);
+        assertThat(loaded.getAttemptCount()).isEqualTo(1);
         assertThat(loaded.getLockedBy()).isEqualTo("worker-1");
         assertThat(loaded.getLockedUntil()).isEqualTo(leaseEnd);
         assertThat(loaded.getStartedAt()).isNotNull();
@@ -179,7 +196,9 @@ class CaptureJobServiceTest {
     void shouldReturnNotFoundForUnknownJob() {
         long unknownJobId = 999_999L;
 
-        assertThatThrownBy(() -> captureJobService.claim(unknownJobId, "worker-1", now()))
+        assertThatThrownBy(
+                () -> captureJobService.claim(unknownJobId, "worker-1", now().plusMinutes(5))
+        )
                 .isInstanceOfSatisfying(
                         BusinessException.class,
                         exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.NOT_FOUND)
@@ -198,10 +217,243 @@ class CaptureJobServiceTest {
                 );
     }
 
+    // [测试意图] 验证只领取已经到期的任务，并按 next_attempt_at、id 的优先级选取。
+    @Test
+    void shouldClaimEarliestEligibleJobAndKeepFutureJobPending() {
+        LocalDateTime baseTime = now();
+        Long futureJobId = createPendingJob(createLinkFixture("capture-order-future"));
+        Long earliestJobId = createPendingJob(createLinkFixture("capture-order-earliest"));
+        Long laterJobId = createPendingJob(createLinkFixture("capture-order-later"));
+
+        setNextAttemptAt(futureJobId, baseTime.plusHours(1));
+        setNextAttemptAt(earliestJobId, baseTime.minusMinutes(2));
+        setNextAttemptAt(laterJobId, baseTime.minusMinutes(1));
+
+        Optional<CaptureJobSummary> first = captureJobService.claimNext(
+                "worker-1",
+                baseTime.plusMinutes(5)
+        );
+        Optional<CaptureJobSummary> second = captureJobService.claimNext(
+                "worker-2",
+                baseTime.plusMinutes(5)
+        );
+        Optional<CaptureJobSummary> third = captureJobService.claimNext(
+                "worker-3",
+                baseTime.plusMinutes(5)
+        );
+
+        assertThat(first).get().extracting(CaptureJobSummary::id).isEqualTo(earliestJobId);
+        assertThat(second).get().extracting(CaptureJobSummary::id).isEqualTo(laterJobId);
+        assertThat(third).isEmpty();
+
+        CaptureJob futureJob = captureJobMapper.selectById(futureJobId);
+        assertThat(futureJob.getStatus()).isEqualTo(CaptureJobStatus.PENDING);
+        assertThat(futureJob.getAttemptCount()).isZero();
+    }
+
+    // [测试意图] 验证队列没有到期任务时返回空结果，而不是异常或 404。
+    @Test
+    void shouldReturnEmptyWhenNoJobIsEligible() {
+        LocalDateTime baseTime = now();
+        Long futureJobId = createPendingJob(createLinkFixture("capture-empty"));
+        setNextAttemptAt(futureJobId, baseTime.plusHours(1));
+
+        Optional<CaptureJobSummary> claimed = captureJobService.claimNext(
+                "worker-1",
+                baseTime.plusMinutes(5)
+        );
+
+        assertThat(claimed).isEmpty();
+        CaptureJob futureJob = captureJobMapper.selectById(futureJobId);
+        assertThat(futureJob.getStatus()).isEqualTo(CaptureJobStatus.PENDING);
+        assertThat(futureJob.getAttemptCount()).isZero();
+    }
+
+    // [测试意图] 验证两个 Worker 并发争抢一条任务时，只有一个能够成功领取。
+    @Test
+    void shouldAllowOnlyOneWorkerToClaimTheSameJob() throws Exception {
+        Long jobId = createPendingJob(createLinkFixture("capture-concurrent-one"));
+
+        List<ClaimOutcome> outcomes = claimConcurrently(
+                List.of("worker-1", "worker-2"),
+                now().plusMinutes(5)
+        );
+        List<ClaimOutcome> winners = outcomes.stream()
+                .filter(outcome -> outcome.job().isPresent())
+                .toList();
+
+        assertThat(winners).hasSize(1);
+        assertThat(winners.get(0).job().orElseThrow().id()).isEqualTo(jobId);
+
+        CaptureJob claimed = captureJobMapper.selectById(jobId);
+        assertThat(claimed.getStatus()).isEqualTo(CaptureJobStatus.RUNNING);
+        assertThat(claimed.getAttemptCount()).isEqualTo(1);
+        assertThat(claimed.getLockedBy()).isEqualTo(winners.get(0).workerId());
+    }
+
+    // [测试意图] 验证两个 Worker 并发领取两条任务时拿到不同任务，且每条只增加一次尝试次数。
+    @Test
+    void shouldGiveConcurrentWorkersDifferentJobs() throws Exception {
+        Long firstJobId = createPendingJob(createLinkFixture("capture-concurrent-two-a"));
+        Long secondJobId = createPendingJob(createLinkFixture("capture-concurrent-two-b"));
+
+        List<ClaimOutcome> outcomes = claimConcurrently(
+                List.of("worker-1", "worker-2"),
+                now().plusMinutes(5)
+        );
+
+        assertThat(outcomes).allSatisfy(outcome -> assertThat(outcome.job()).isPresent());
+        List<Long> claimedIds = outcomes.stream()
+                .map(outcome -> outcome.job().orElseThrow().id())
+                .toList();
+        assertThat(claimedIds)
+                .doesNotHaveDuplicates()
+                .containsExactlyInAnyOrder(firstJobId, secondJobId);
+
+        for (ClaimOutcome outcome : outcomes) {
+            CaptureJob claimed = captureJobMapper.selectById(outcome.job().orElseThrow().id());
+            assertThat(claimed.getStatus()).isEqualTo(CaptureJobStatus.RUNNING);
+            assertThat(claimed.getAttemptCount()).isEqualTo(1);
+            assertThat(claimed.getLockedBy()).isEqualTo(outcome.workerId());
+        }
+    }
+
+    // [测试意图] 验证其他事务锁住唯一任务时 SKIP LOCKED 立即返回空，释放后任务仍可领取。
+    @Test
+    void shouldSkipJobLockedByAnotherTransactionAndClaimAfterRelease() throws Exception {
+        Long jobId = createPendingJob(createLinkFixture("capture-skip-locked"));
+        LocalDateTime leaseEnd = now().plusMinutes(5);
+
+        try (Connection lockConnection = dataSource.getConnection()) {
+            lockConnection.setAutoCommit(false);
+            ExecutorService executor = Executors.newSingleThreadExecutor();
+
+            try {
+                lockEligibleJob(lockConnection, jobId);
+
+                Future<Optional<CaptureJobSummary>> blockedClaim = executor.submit(
+                        () -> captureJobService.claimNext("worker-2", leaseEnd)
+                );
+
+                assertThat(blockedClaim.get(2, TimeUnit.SECONDS)).isEmpty();
+                assertThat(captureJobMapper.selectById(jobId).getStatus())
+                        .isEqualTo(CaptureJobStatus.PENDING);
+            } finally {
+                lockConnection.rollback();
+                executor.shutdownNow();
+            }
+        }
+
+        Optional<CaptureJobSummary> claimed = captureJobService.claimNext("worker-2", leaseEnd);
+
+        assertThat(claimed).get().extracting(CaptureJobSummary::id).isEqualTo(jobId);
+        CaptureJob loaded = captureJobMapper.selectById(jobId);
+        assertThat(loaded.getStatus()).isEqualTo(CaptureJobStatus.RUNNING);
+        assertThat(loaded.getAttemptCount()).isEqualTo(1);
+        assertThat(loaded.getLockedBy()).isEqualTo("worker-2");
+    }
+
+    // [测试意图] 验证空白或超长 Worker、空租约和过期租约在访问数据库前被拒绝。
+    @Test
+    void shouldRejectInvalidClaimParameters() {
+        LocalDateTime validLeaseEnd = now().plusMinutes(5);
+
+        assertThatThrownBy(() -> captureJobService.claimNext(null, validLeaseEnd))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("workerId");
+
+        assertThatThrownBy(() -> captureJobService.claimNext("   ", validLeaseEnd))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("workerId");
+
+        assertThatThrownBy(() -> captureJobService.claimNext("x".repeat(101), validLeaseEnd))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("100");
+
+        assertThatThrownBy(() -> captureJobService.claimNext("worker-1", null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("lockedUntil");
+
+        assertThatThrownBy(
+                () -> captureJobService.claimNext("worker-1", now().minusSeconds(1))
+        )
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("晚于当前时间");
+    }
+
     private Long createPendingJob(LinkFixture fixture) {
         return captureJobService
                 .createPending(fixture.linkId(), fixture.userId(), now())
                 .id();
+    }
+
+    private void setNextAttemptAt(Long jobId, LocalDateTime nextAttemptAt) {
+        jdbcTemplate.update(
+                "UPDATE capture_job SET next_attempt_at = ? WHERE id = ?",
+                Timestamp.valueOf(nextAttemptAt),
+                jobId
+        );
+    }
+
+    private List<ClaimOutcome> claimConcurrently(
+            List<String> workerIds,
+            LocalDateTime lockedUntil
+    ) throws Exception {
+        ExecutorService executor = Executors.newFixedThreadPool(workerIds.size());
+        CountDownLatch ready = new CountDownLatch(workerIds.size());
+        CountDownLatch start = new CountDownLatch(1);
+
+        try {
+            List<Future<ClaimOutcome>> futures = new ArrayList<>();
+
+            for (String workerId : workerIds) {
+                futures.add(executor.submit(() -> {
+                    ready.countDown();
+
+                    if (!start.await(5, TimeUnit.SECONDS)) {
+                        throw new IllegalStateException("并发测试未能同时启动");
+                    }
+
+                    return new ClaimOutcome(
+                            workerId,
+                            captureJobService.claimNext(workerId, lockedUntil)
+                    );
+                }));
+            }
+
+            assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+
+            List<ClaimOutcome> outcomes = new ArrayList<>();
+            for (Future<ClaimOutcome> future : futures) {
+                outcomes.add(future.get(5, TimeUnit.SECONDS));
+            }
+            return outcomes;
+        } finally {
+            start.countDown();
+            executor.shutdownNow();
+        }
+    }
+
+    private void lockEligibleJob(Connection connection, Long expectedJobId) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement(
+                """
+                SELECT id
+                FROM capture_job
+                WHERE status = 'PENDING'
+                  AND next_attempt_at <= ?
+                ORDER BY next_attempt_at, id
+                LIMIT 1
+                FOR UPDATE
+                """
+        )) {
+            statement.setTimestamp(1, Timestamp.valueOf(now().plusMinutes(1)));
+
+            try (ResultSet result = statement.executeQuery()) {
+                assertThat(result.next()).isTrue();
+                assertThat(result.getLong("id")).isEqualTo(expectedJobId);
+            }
+        }
     }
 
     private LinkFixture createLinkFixture(String username) {
@@ -251,5 +503,11 @@ class CaptureJobServiceTest {
     }
 
     private record LinkFixture(Long userId, Long linkId) {
+    }
+
+    private record ClaimOutcome(
+            String workerId,
+            Optional<CaptureJobSummary> job
+    ) {
     }
 }

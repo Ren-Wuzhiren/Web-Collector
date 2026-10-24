@@ -14,6 +14,7 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
+import java.util.Optional;
 
 /**
  * [业务] 抓取任务的创建与状态流转入口。
@@ -26,6 +27,7 @@ import java.time.temporal.ChronoUnit;
 public class CaptureJobService {
     // [业务] 与 M3 的指数退避读同一个含义：这条任务总共允许尝试几次。
     private static final int DEFAULT_MAX_ATTEMPTS = 3;
+    private static final int MAX_WORKER_ID_LENGTH = 100;
 
     private final CaptureJobMapper captureJobMapper;
     private final Clock clock;
@@ -45,7 +47,6 @@ public class CaptureJobService {
      * [排错] 如果改成 REQUIRES_NEW，任务会在独立事务里提交；
      * 链接随后回滚时任务仍然留着，Worker 会去抓一条不存在的链接。
      */
-
     @Transactional
     public CaptureJobSummary createPending(Long linkId, Long requestedBy, LocalDateTime now) {
         CaptureJob job = new CaptureJob();
@@ -68,42 +69,46 @@ public class CaptureJobService {
     }
 
     /**
-     * [业务] 认领一条待抓取任务：PENDING → RUNNING，并登记租约。
+     * [业务] 领取队列中下一条已经到期的 PENDING 任务。
      *
-     * [408] 这里用“条件更新 + 受影响行数”而不是“先查后改”：UPDATE 的 WHERE 里直接带上
-     * status='PENDING'，判断和修改在同一条 SQL 里完成，中间没有可插入的时间窗。
-     * 并发下两个调用方最多只有一个能拿到 1 行，另一个拿到 0 行。
+     * [数据库] 查询、条件更新和回读处于同一个事务。
+     * SELECT ... FOR UPDATE 锁住候选行，随后才把它改成 RUNNING；
+     * 事务提交前，其他 Worker 会通过 SKIP LOCKED 跳过这一行。
      *
-     * [业务] 锁的有效期由调用方决定：Worker 应该传“现在 + 预计最长处理时间”。
-     * 到期后怎么恢复属于 M3.3，本方法只负责把租约写下来。
+     * [业务] 队列为空是正常状态，返回 Optional.empty()，不是 404。
      */
     @Transactional
-    public CaptureJobSummary claim(Long jobId, String workerId, LocalDateTime lockedUntil) {
-        // [排错] 租约不能为空：M3.3 的恢复扫描依赖 locked_until，
-        // 写成 NULL 的任务永远等不到“锁过期”那一刻。
-        if (lockedUntil == null) {
-            throw new IllegalArgumentException("lockedUntil 不能为空");
-        }
-
+    public Optional<CaptureJobSummary> claimNext(
+            String workerId,
+            LocalDateTime lockedUntil
+    ) {
         LocalDateTime now = now();
+        LocalDateTime leaseEnd = validateClaimParameters(workerId, lockedUntil, now);
+        Long jobId = captureJobMapper.selectNextClaimableJobId(now);
 
-        int updated = captureJobMapper.update(
-                null,
-                new LambdaUpdateWrapper<CaptureJob>()
-                        .eq(CaptureJob::getId, jobId)
-                        .eq(CaptureJob::getStatus, CaptureJobStatus.PENDING)
-                        .set(CaptureJob::getStatus, CaptureJobStatus.RUNNING)
-                        .set(CaptureJob::getLockedBy, workerId)
-                        .set(CaptureJob::getLockedUntil, lockedUntil)
-                        .set(CaptureJob::getStartedAt, now)
-                        .set(CaptureJob::getUpdatedAt, now)
-        );
-
-        if (updated == 0) {
-            throw transitionFailure(jobId);
+        if (jobId == null) {
+            return Optional.empty();
         }
 
-        return toSummary(requireJob(jobId));
+        return Optional.of(claimPendingJob(jobId, workerId, now, leaseEnd));
+    }
+
+    /**
+     * [业务] 按任务 id 领取指定的 PENDING 任务。
+     *
+     * [408] 与 claimNext 共用同一条条件更新逻辑，避免两条领取入口
+     * 对 attempt_count、锁字段或时间字段采用不同规则。
+     */
+    @Transactional
+    public CaptureJobSummary claim(
+            Long jobId,
+            String workerId,
+            LocalDateTime lockedUntil
+    ) {
+        LocalDateTime now = now();
+        LocalDateTime leaseEnd = validateClaimParameters(workerId, lockedUntil, now);
+
+        return claimPendingJob(jobId, workerId, now, leaseEnd);
     }
 
     /**
@@ -125,6 +130,32 @@ public class CaptureJobService {
     @Transactional
     public CaptureJobSummary fail(Long jobId, String errorCode, String errorMessage) {
         return finish(jobId, CaptureJobStatus.FAILED, errorCode, errorMessage);
+    }
+
+    /**
+     * [业务] 两个领取入口共用的条件更新。
+     *
+     * [数据库] 候选行已经被当前事务锁定；这里仍保留
+     * WHERE status='PENDING'，防止以后调用路径变化时误覆盖状态。
+     */
+    private CaptureJobSummary claimPendingJob(
+            Long jobId,
+            String workerId,
+            LocalDateTime now,
+            LocalDateTime lockedUntil
+    ) {
+        int updated = captureJobMapper.claimPendingJob(
+                jobId,
+                workerId,
+                now,
+                lockedUntil
+        );
+
+        if (updated == 0) {
+            throw transitionFailure(jobId);
+        }
+
+        return toSummary(requireJob(jobId));
     }
 
     private CaptureJobSummary finish(
@@ -158,6 +189,38 @@ public class CaptureJobService {
         }
 
         return toSummary(requireJob(jobId));
+    }
+
+    /**
+     * [业务] 校验领取参数，并返回已经对齐 DATETIME(3) 精度的租约截止时间。
+     *
+     * [排错] 已经过期的租约不能用来领取任务，否则任务刚进入 RUNNING
+     * 就已经满足锁超时条件，后续恢复逻辑会立刻把它捞走。
+     */
+    private LocalDateTime validateClaimParameters(
+            String workerId,
+            LocalDateTime lockedUntil,
+            LocalDateTime now
+    ) {
+        if (workerId == null || workerId.isBlank()) {
+            throw new IllegalArgumentException("workerId 不能为空");
+        }
+
+        if (workerId.length() > MAX_WORKER_ID_LENGTH) {
+            throw new IllegalArgumentException("workerId 不能超过 100 个字符");
+        }
+
+        if (lockedUntil == null) {
+            throw new IllegalArgumentException("lockedUntil 不能为空");
+        }
+
+        LocalDateTime leaseEnd = lockedUntil.truncatedTo(ChronoUnit.MILLIS);
+
+        if (!leaseEnd.isAfter(now)) {
+            throw new IllegalArgumentException("lockedUntil 必须晚于当前时间");
+        }
+
+        return leaseEnd;
     }
 
     /**
