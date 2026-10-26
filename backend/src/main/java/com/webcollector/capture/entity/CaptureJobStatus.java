@@ -19,6 +19,13 @@ public enum CaptureJobStatus {
      * 终态不再出去；失败重试是 M3.3 的事，届时要显式在这里加一条 FAILED→PENDING，
      * 而不是现在提前放宽规则。
      */
+
+    /**
+     * [业务] 允许的迁移是显式白名单，不在白名单中的跳转一律拒绝。
+     *
+     * [408] RUNNING→PENDING 表示失败后仍有尝试次数；
+     * FAILED→PENDING 留给 M3.4 的手动重新采集，本步不放行。
+     */
     public boolean canTransitionTo(CaptureJobStatus target) {
         if (target == null || target == this) {
             return false;
@@ -26,7 +33,9 @@ public enum CaptureJobStatus {
 
         return switch (this) {
             case PENDING -> target == RUNNING;
-            case RUNNING -> target == SUCCEEDED || target == FAILED;
+            case RUNNING -> target == PENDING
+                    || target == SUCCEEDED
+                    || target == FAILED;
             case SUCCEEDED, FAILED -> false;
         };
     }

@@ -11,9 +11,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -28,6 +30,11 @@ public class CaptureJobService {
     // [业务] 与 M3 的指数退避读同一个含义：这条任务总共允许尝试几次。
     private static final int DEFAULT_MAX_ATTEMPTS = 3;
     private static final int MAX_WORKER_ID_LENGTH = 100;
+    private static final int RECOVERY_BATCH_SIZE = 100;
+    private static final Duration FIRST_RETRY_DELAY = Duration.ofSeconds(30);
+    private static final Duration SECOND_RETRY_DELAY = Duration.ofSeconds(120);
+    private static final String LEASE_EXPIRED_ERROR_CODE = "WORKER_LEASE_EXPIRED";
+    private static final String LEASE_EXPIRED_ERROR_MESSAGE = "Worker 租约已过期";
 
     private final CaptureJobMapper captureJobMapper;
     private final Clock clock;
@@ -117,9 +124,33 @@ public class CaptureJobService {
      * [软件工程] 委托给 finish 统一处理收尾字段，避免 complete 与 fail 各写一套、
      * 将来漏掉某个字段（尤其是租约清理）。
      */
+
+    /**
+     * [业务] 成功终态会清除之前重试留下的错误信息。
+     */
     @Transactional
     public CaptureJobSummary complete(Long jobId) {
-        return finish(jobId, CaptureJobStatus.SUCCEEDED, null, null);
+        LocalDateTime now = now();
+
+        int updated = captureJobMapper.update(
+                null,
+                new LambdaUpdateWrapper<CaptureJob>()
+                        .eq(CaptureJob::getId, jobId)
+                        .eq(CaptureJob::getStatus, CaptureJobStatus.RUNNING)
+                        .set(CaptureJob::getStatus, CaptureJobStatus.SUCCEEDED)
+                        .set(CaptureJob::getFinishedAt, now)
+                        .set(CaptureJob::getUpdatedAt, now)
+                        .set(CaptureJob::getLockedBy, null)
+                        .set(CaptureJob::getLockedUntil, null)
+                        .set(CaptureJob::getErrorCode, null)
+                        .set(CaptureJob::getErrorMessage, null)
+        );
+
+        if (updated == 0) {
+            throw transitionFailure(jobId);
+        }
+
+        return toSummary(requireJob(jobId));
     }
 
     /**
@@ -127,9 +158,90 @@ public class CaptureJobService {
      *
      * [业务] 本轮 fail 直接进终态；失败重试与指数退避排在 M3.3，不在这里提前实现。
      */
+
+    /**
+     * [业务] 失败后根据已经消耗的尝试次数决定重试或终结。
+     */
     @Transactional
     public CaptureJobSummary fail(Long jobId, String errorCode, String errorMessage) {
-        return finish(jobId, CaptureJobStatus.FAILED, errorCode, errorMessage);
+        CaptureJob job = requireJob(jobId);
+        LocalDateTime now = now();
+        CaptureJobStatus target = job.getAttemptCount() < job.getMaxAttempts()
+                ? CaptureJobStatus.PENDING
+                : CaptureJobStatus.FAILED;
+
+        if(!job.getStatus().canTransitionTo(target)) {
+            throw new BusinessException(ErrorCode.CAPTURE_JOB_INVALID_STATE);
+        }
+
+        LambdaUpdateWrapper<CaptureJob> update = new LambdaUpdateWrapper<CaptureJob>()
+                .eq(CaptureJob::getId, jobId)
+                .eq(CaptureJob::getStatus, CaptureJobStatus.RUNNING)
+                .set(CaptureJob::getStatus, target)
+                .set(CaptureJob::getErrorCode, errorCode)
+                .set(CaptureJob::getErrorMessage, errorMessage)
+                .set(CaptureJob::getUpdatedAt, now)
+                .set(CaptureJob::getLockedBy, null)
+                .set(CaptureJob::getLockedUntil, null);
+
+        if (target == CaptureJobStatus.PENDING) {
+            update.set(
+                    CaptureJob::getNextAttemptAt,
+                    now.plus(retryDelayForAttempt(job.getAttemptCount()))
+            );
+            update.set(CaptureJob::getFinishedAt, null);
+        } else {
+            update.set(CaptureJob::getFinishedAt, now);
+        }
+
+        int updated = captureJobMapper.update(null, update);
+
+        if (updated == 0) {
+            throw transitionFailure(jobId);
+        }
+
+        return toSummary(requireJob(jobId));
+    }
+
+    /**
+     * [业务] 找回租约过期但未终态的任务，单次最多处理 100 条。
+     *
+     * [数据库] SELECT 与后续 UPDATE 处于同一事务；SKIP LOCKED 允许
+     * 多个恢复调用各处理不同批次，不会重复领取同一行。
+     */
+    @Transactional
+    public int recoverExpiredJobs() {
+        LocalDateTime now = now();
+        List<Long> jobIds = captureJobMapper.selectExpiredRunningJobIds(
+                now,
+                RECOVERY_BATCH_SIZE
+        );
+        int recovered = 0;
+
+        for (Long jobId : jobIds) {
+            CaptureJob job = requireJob(jobId);
+            int updated;
+
+            if (job.getAttemptCount() < job.getMaxAttempts()) {
+                updated = captureJobMapper.requeueExpiredJob(
+                        jobId,
+                        now,
+                        LEASE_EXPIRED_ERROR_CODE,
+                        LEASE_EXPIRED_ERROR_MESSAGE
+                );
+            } else {
+                updated = captureJobMapper.failExpiredJob(
+                        jobId,
+                        now,
+                        LEASE_EXPIRED_ERROR_CODE,
+                        LEASE_EXPIRED_ERROR_MESSAGE
+                );
+            }
+
+            recovered += updated;
+        }
+
+        return recovered;
     }
 
     /**
@@ -156,6 +268,10 @@ public class CaptureJobService {
         }
 
         return toSummary(requireJob(jobId));
+    }
+
+    private Duration retryDelayForAttempt(int attemptCount) {
+        return attemptCount <= 1 ? FIRST_RETRY_DELAY : SECOND_RETRY_DELAY;
     }
 
     private CaptureJobSummary finish(

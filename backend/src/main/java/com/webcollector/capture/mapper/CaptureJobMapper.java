@@ -7,6 +7,7 @@ import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * [软件工程] 普通持久化操作复用 BaseMapper；需要行锁、SKIP LOCKED 和
@@ -60,5 +61,73 @@ public interface CaptureJobMapper extends BaseMapper<CaptureJob> {
             @Param("workerId") String workerId,
             @Param("now") LocalDateTime now,
             @Param("lockedUntil") LocalDateTime lockedUntil
+    );
+
+    /**
+     * [业务] 锁定一批租约已经过期的 RUNNING 任务。
+     */
+    @Select("""
+            SELECT id
+            FROM capture_job
+            WHERE status = 'RUNNING'
+                AND locked_until IS NOT NULL
+                AND locked_until <= #{now}
+            ORDER BY locked_until, id
+            LIMIT #{limit}
+            FOR UPDATE SKIP LOCKED
+            """
+    )
+    List<Long> selectExpiredRunningJobIds(
+            @Param("now") LocalDateTime now,
+            @Param("limit") int limit
+    );
+
+    /**
+     * [业务] 租约过期但仍可重试：立即回到 PENDING。
+     */
+    @Update("""
+            UPDATE capture_job
+            SET status = 'PENDING',
+                next_attempt_at = #{now},
+                locked_by = NULL,
+                locked_until = NULL,
+                finished_at = NULL,
+                error_code = #{errorCode},
+                error_message = #{errorMessage},
+                updated_at = #{now}
+            WHERE id = #{jobId}
+              AND status = 'RUNNING'
+              AND locked_until IS NOT NULL
+              AND locked_until <= #{now}
+            """)
+    int requeueExpiredJob(
+            @Param("jobId") Long jobId,
+            @Param("now") LocalDateTime now,
+            @Param("errorCode") String errorCode,
+            @Param("errorMessage") String errorMessage
+    );
+
+    /**
+     * [业务] 租约过期且尝试次数已耗尽：进入 FAILED。
+     */
+    @Update("""
+            UPDATE capture_job
+            SET status = 'FAILED',
+                locked_by = NULL,
+                locked_until = NULL,
+                finished_at = #{now},
+                error_code = #{errorCode},
+                error_message = #{errorMessage},
+                updated_at = #{now}
+            WHERE id = #{jobId}
+              AND status = 'RUNNING'
+              AND locked_until IS NOT NULL
+              AND locked_until <= #{now}
+            """)
+    int failExpiredJob(
+            @Param("jobId") Long jobId,
+            @Param("now") LocalDateTime now,
+            @Param("errorCode") String errorCode,
+            @Param("errorMessage") String errorMessage
     );
 }

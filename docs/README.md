@@ -6,7 +6,7 @@
 
 文档同步基线：2026-10-24。
 
-阶段 1 用户与鉴权、阶段 2 收藏领域模型与 CRUD 已完成；阶段 3 的 `M3.1` 与 `M3.2` 均已通过工程、自动化和学习验收。`M3.2` 使用 `FOR UPDATE SKIP LOCKED` 支持多 Worker 安全抢占；`M2.6` 学习题经用户确认暂缓。最近一次 `mvn -pl backend test` 为 227 项通过，0 失败、0 错误；V1–V9 Flyway 迁移、MySQL 唯一键、任务创建、状态迁移和 `SKIP LOCKED` 抢占均已通过 Testcontainers 验证。
+阶段 1 用户与鉴权、阶段 2 收藏领域模型与 CRUD 已完成；阶段 3 的 `M3.1`、`M3.2`、`M3.3` 均已通过工程、自动化与学习验收。`M3.4` 当前进入假 Worker 验证；`M2.6` 学习题经用户确认暂缓。最近一次 `mvn -pl backend test` 为 236 项通过，0 失败、0 错误；任务创建、状态迁移、`SKIP LOCKED` 抢占、失败退避和锁超时恢复均已通过 Testcontainers 验证。
 
 `docs/源码研读/` 描述固定的 Linkwarden v2.16.3，不随自有实现阶段变化。
 

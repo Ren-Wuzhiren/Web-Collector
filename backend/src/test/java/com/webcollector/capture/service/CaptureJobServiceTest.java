@@ -130,13 +130,13 @@ class CaptureJobServiceTest {
                 "目标站点响应超时"
         );
 
-        assertThat(summary.status()).isEqualTo(CaptureJobStatus.FAILED);
+        assertThat(summary.status()).isEqualTo(CaptureJobStatus.PENDING);
 
         CaptureJob loaded = captureJobMapper.selectById(jobId);
-        assertThat(loaded.getStatus()).isEqualTo(CaptureJobStatus.FAILED);
+        assertThat(loaded.getStatus()).isEqualTo(CaptureJobStatus.PENDING);
         assertThat(loaded.getErrorCode()).isEqualTo("NETWORK_TIMEOUT");
         assertThat(loaded.getErrorMessage()).isEqualTo("目标站点响应超时");
-        assertThat(loaded.getFinishedAt()).isNotNull();
+        assertThat(loaded.getFinishedAt()).isNull();
         assertThat(loaded.getLockedBy()).isNull();
         assertThat(loaded.getLockedUntil()).isNull();
     }
@@ -189,6 +189,192 @@ class CaptureJobServiceTest {
                         exception -> assertThat(exception.getErrorCode())
                                 .isEqualTo(ErrorCode.CAPTURE_JOB_INVALID_STATE)
                 );
+    }
+
+    // [测试意图] 验证第一次失败进入 PENDING，并把下一次领取推迟 30 秒。
+    @Test
+    void shouldRetryFirstFailureAfterThirtySeconds() {
+        Long jobId = createPendingJob(createLinkFixture("capture-retry-first"));
+        captureJobService.claim(jobId, "worker-1", now().plusMinutes(5));
+        LocalDateTime failedAt = now();
+
+        CaptureJobSummary summary = captureJobService.fail(
+                jobId,
+                "NETWORK_TIMEOUT",
+                "第一次超时"
+        );
+
+        assertThat(summary.status()).isEqualTo(CaptureJobStatus.PENDING);
+        CaptureJob loaded = captureJobMapper.selectById(jobId);
+        assertThat(loaded.getNextAttemptAt())
+                .isEqualTo(loaded.getUpdatedAt().plusSeconds(30));
+        assertThat(loaded.getFinishedAt()).isNull();
+        assertThat(loaded.getLockedBy()).isNull();
+        assertThat(loaded.getLockedUntil()).isNull();
+        assertThat(loaded.getErrorCode()).isEqualTo("NETWORK_TIMEOUT");
+    }
+
+    // [测试意图] 验证第二次失败进入 PENDING，并把下一次领取推迟 120 秒。
+    @Test
+    void shouldRetrySecondFailureAfterTwoMinutes() {
+        Long jobId = createPendingJob(createLinkFixture("capture-retry-second"));
+        captureJobService.claim(jobId, "worker-1", now().plusMinutes(5));
+        captureJobService.fail(jobId, "TIMEOUT_1", "第一次失败");
+
+        moveNextAttemptToNow(jobId);
+        captureJobService.claim(jobId, "worker-1", now().plusMinutes(5));
+        CaptureJobSummary summary = captureJobService.fail(
+                jobId,
+                "TIMEOUT_2",
+                "第二次失败"
+        );
+
+        assertThat(summary.status()).isEqualTo(CaptureJobStatus.PENDING);
+        CaptureJob loaded = captureJobMapper.selectById(jobId);
+        assertThat(loaded.getNextAttemptAt()).isEqualTo(loaded.getUpdatedAt().plusSeconds(120));
+        assertThat(loaded.getFinishedAt()).isNull();
+        assertThat(loaded.getAttemptCount()).isEqualTo(2);
+    }
+
+    // [测试意图] 验证第三次失败进入 FAILED，且不再被任务领取查询选中。
+    @Test
+    void shouldFailPermanentlyAfterThirdFailure() {
+        Long jobId = createPendingJob(createLinkFixture("capture-retry-third"));
+
+        for (int attempt = 1; attempt <= 3; attempt++) {
+            if (attempt > 1) {
+                moveNextAttemptToNow(jobId);
+            }
+            captureJobService.claim(jobId, "worker-1", now().plusMinutes(5));
+            captureJobService.fail(jobId, "TIMEOUT_" + attempt, "第" + attempt + "次失败");
+        }
+
+        CaptureJob loaded = captureJobMapper.selectById(jobId);
+        assertThat(loaded.getStatus()).isEqualTo(CaptureJobStatus.FAILED);
+        assertThat(loaded.getFinishedAt()).isNotNull();
+        assertThat(loaded.getAttemptCount()).isEqualTo(3);
+        assertThat(captureJobService.claimNext("worker-2", now().plusMinutes(5))).isEmpty();
+    }
+
+    // [测试意图] 验证退避期间不能领取，到期后任务重新可领取。
+    @Test
+    void shouldRespectRetryBackoffBeforeClaimingAgain() {
+        Long jobId = createPendingJob(createLinkFixture("capture-backoff"));
+        captureJobService.claim(jobId, "worker-1", now().plusMinutes(5));
+        captureJobService.fail(jobId, "TIMEOUT", "需要退避");
+
+        assertThat(captureJobService.claimNext("worker-2", now().plusMinutes(5))).isEmpty();
+
+        moveNextAttemptToNow(jobId);
+        assertThat(captureJobService.claimNext("worker-2", now().plusMinutes(5)))
+                .get()
+                .extracting(CaptureJobSummary::id)
+                .isEqualTo(jobId);
+    }
+
+    // [测试意图] 验证重试后成功会清除之前失败留下的错误字段。
+    @Test
+    void shouldClearPreviousErrorWhenRetryEventuallySucceeds() {
+        Long jobId = createPendingJob(createLinkFixture("capture-retry-success"));
+        captureJobService.claim(jobId, "worker-1", now().plusMinutes(5));
+        captureJobService.fail(jobId, "TIMEOUT", "第一次失败");
+
+        moveNextAttemptToNow(jobId);
+        captureJobService.claim(jobId, "worker-1", now().plusMinutes(5));
+        captureJobService.complete(jobId);
+
+        CaptureJob loaded = captureJobMapper.selectById(jobId);
+        assertThat(loaded.getStatus()).isEqualTo(CaptureJobStatus.SUCCEEDED);
+        assertThat(loaded.getErrorCode()).isNull();
+        assertThat(loaded.getErrorMessage()).isNull();
+    }
+
+    // [测试意图] 验证过期租约但尚未达到上限时立即回到 PENDING。
+    @Test
+    void shouldRequeueExpiredRunningJobWhenAttemptsRemain() {
+        Long jobId = createPendingJob(createLinkFixture("capture-recover-pending"));
+        captureJobService.claim(jobId, "worker-1", now().plusMinutes(5));
+        setLockedUntil(jobId, now().minusMinutes(1));
+
+        int recovered = captureJobService.recoverExpiredJobs();
+
+        assertThat(recovered).isEqualTo(1);
+        CaptureJob loaded = captureJobMapper.selectById(jobId);
+        assertThat(loaded.getStatus()).isEqualTo(CaptureJobStatus.PENDING);
+        assertThat(loaded.getNextAttemptAt()).isEqualTo(loaded.getUpdatedAt());
+        assertThat(loaded.getLockedBy()).isNull();
+        assertThat(loaded.getLockedUntil()).isNull();
+        assertThat(loaded.getFinishedAt()).isNull();
+        assertThat(loaded.getErrorCode()).isEqualTo("WORKER_LEASE_EXPIRED");
+    }
+
+    // [测试意图] 验证过期租约且已经达到上限时直接进入 FAILED。
+    @Test
+    void shouldFailExpiredRunningJobWhenAttemptsAreExhausted() {
+        Long jobId = createPendingJob(createLinkFixture("capture-recover-failed"));
+        captureJobService.claim(jobId, "worker-1", now().plusMinutes(5));
+        captureJobService.fail(jobId, "TIMEOUT_1", "第一次失败");
+        moveNextAttemptToNow(jobId);
+        captureJobService.claim(jobId, "worker-1", now().plusMinutes(5));
+        captureJobService.fail(jobId, "TIMEOUT_2", "第二次失败");
+        moveNextAttemptToNow(jobId);
+        captureJobService.claim(jobId, "worker-1", now().plusMinutes(5));
+        setLockedUntil(jobId, now().minusMinutes(1));
+
+        int recovered = captureJobService.recoverExpiredJobs();
+
+        assertThat(recovered).isEqualTo(1);
+        CaptureJob loaded = captureJobMapper.selectById(jobId);
+        assertThat(loaded.getStatus()).isEqualTo(CaptureJobStatus.FAILED);
+        assertThat(loaded.getFinishedAt()).isNotNull();
+        assertThat(loaded.getLockedBy()).isNull();
+        assertThat(loaded.getLockedUntil()).isNull();
+        assertThat(loaded.getErrorCode()).isEqualTo("WORKER_LEASE_EXPIRED");
+    }
+
+    // [测试意图] 验证活动租约不会被恢复扫描修改。
+    @Test
+    void shouldKeepActiveLeaseUntouched() {
+        Long jobId = createPendingJob(createLinkFixture("capture-recover-active"));
+        LocalDateTime leaseEnd = now().plusMinutes(5);
+        captureJobService.claim(jobId, "worker-1", leaseEnd);
+
+        int recovered = captureJobService.recoverExpiredJobs();
+
+        assertThat(recovered).isZero();
+        CaptureJob loaded = captureJobMapper.selectById(jobId);
+        assertThat(loaded.getStatus()).isEqualTo(CaptureJobStatus.RUNNING);
+        assertThat(loaded.getLockedBy()).isEqualTo("worker-1");
+        assertThat(loaded.getLockedUntil()).isEqualTo(leaseEnd);
+    }
+
+    // [测试意图] 验证恢复后的任务不会被第二次恢复重复处理。
+    @Test
+    void shouldMakeExpiredRecoveryIdempotent() {
+        Long jobId = createPendingJob(createLinkFixture("capture-recover-idempotent"));
+        captureJobService.claim(jobId, "worker-1", now().plusMinutes(5));
+        setLockedUntil(jobId, now().minusMinutes(1));
+
+        assertThat(captureJobService.recoverExpiredJobs()).isEqualTo(1);
+        assertThat(captureJobService.recoverExpiredJobs()).isZero();
+        assertThat(captureJobMapper.selectById(jobId).getStatus())
+                .isEqualTo(CaptureJobStatus.PENDING);
+    }
+
+    private void moveNextAttemptToNow(Long jobId) {
+        jdbcTemplate.update(
+                "UPDATE capture_job SET next_attempt_at = ? WHERE id = ?",
+                Timestamp.valueOf(now().minusSeconds(1)),
+                jobId
+        );
+    }
+
+    private void setLockedUntil(Long jobId, LocalDateTime lockedUntil) {
+        jdbcTemplate.update(
+                "UPDATE capture_job SET locked_until = ? WHERE id = ?",
+                Timestamp.valueOf(lockedUntil),
+                jobId
+        );
     }
 
     // [测试意图] 验证三个迁移方法遇到不存在的任务都返回 404，而不是 409 或空指针。

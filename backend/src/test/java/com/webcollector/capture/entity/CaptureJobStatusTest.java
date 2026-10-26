@@ -10,6 +10,7 @@ class CaptureJobStatusTest {
     @Test
     void shouldAllowWhitelistedTransitions() {
         assertThat(CaptureJobStatus.PENDING.canTransitionTo(CaptureJobStatus.RUNNING)).isTrue();
+        assertThat(CaptureJobStatus.RUNNING.canTransitionTo(CaptureJobStatus.PENDING)).isTrue();
         assertThat(CaptureJobStatus.RUNNING.canTransitionTo(CaptureJobStatus.SUCCEEDED)).isTrue();
         assertThat(CaptureJobStatus.RUNNING.canTransitionTo(CaptureJobStatus.FAILED)).isTrue();
     }
