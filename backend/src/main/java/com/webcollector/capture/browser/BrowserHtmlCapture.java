@@ -18,4 +18,13 @@ public interface BrowserHtmlCapture {
      * @return 实际写入的文件路径
      */
     Path capture(String url, Path outputPath);
+
+    /**
+     * 同一次页面导航输出 HTML、A4 PDF 和全页 PNG 截图。
+     * 输出目录中对应文件必须尚不存在。
+     */
+    BrowserCaptureArtifacts captureSnapshot(
+            String url,
+            Path outputDirectory
+    );
 }
