@@ -1,14 +1,15 @@
 package com.webcollector.capture.browser;
 
-import com.microsoft.playwright.Browser;
-import com.microsoft.playwright.BrowserContext;
-import com.microsoft.playwright.BrowserType;
-import com.microsoft.playwright.Page;
-import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.*;
 import com.microsoft.playwright.options.ScreenshotType;
+import com.webcollector.capture.security.NavigationLimitException;
+import com.webcollector.capture.security.SafeNavigationClient;
+import com.webcollector.capture.security.SafeUrlPolicy;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -16,40 +17,78 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-/**
- * 使用同一 Chromium Page 捕获 HTML、PDF 和全页截图。
- *
- * [边界]
- * - 本类不做 SSRF 校验。
- * - 本类不做重定向安全检查。
- * - 本类负责 M4.1 HTML 和 M4.2 PDF/截图输出。
- */
+
+/** M4.4 安全与资源限制接入点。 */
 @Service
 public class PlaywrightBrowserHtmlCapture
         implements BrowserHtmlCapture {
 
     private static final int NAVIGATION_TIMEOUT_MILLIS = 30_000;
-    private static final int VIEWPORT_WIDTH = 1280;
-    private static final int VIEWPORT_HEIGHT = 720;
+    private static final long MAX_HTML_BYTES = 10 * 1024 * 1024;
+
+    private final SafeUrlPolicy safeUrlPolicy;
+    private final SafeNavigationClient safeNavigationClient;
+
+    @Autowired
+    public PlaywrightBrowserHtmlCapture(
+            SafeNavigationClient safeNavigationClient,
+            SafeUrlPolicy safeUrlPolicy
+    ) {
+        this.safeNavigationClient = safeNavigationClient;
+        this.safeUrlPolicy = safeUrlPolicy;
+    }
+
+    /** 兼容 M4.1/M4.2 的直接测试构造方式。 */
+    public PlaywrightBrowserHtmlCapture() {
+        this(
+                new SafeNavigationClient(new SafeUrlPolicy()),
+                new SafeUrlPolicy()
+        );
+    }
 
     @Override
     public Path capture(String url, Path outputPath) {
-        validateUrl(url);
+        validateBasicUrl(url);
         if (outputPath == null) {
             throw new IllegalArgumentException("outputPath 不能为空");
         }
+        URI safeUrl = safeNavigationClient.validateRedirectChain(url);
 
-        Path target = outputPath.toAbsolutePath().normalize();
-        createParentDirectories(target);
+        try (
+                Playwright playwright = Playwright.create();
+                Browser browser = playwright.chromium().launch(
+                        new BrowserType.LaunchOptions().setHeadless(true)
+                );
+                BrowserContext context = browser.newContext();
+                Page page = context.newPage()
+        ) {
+            context.setDefaultTimeout(NAVIGATION_TIMEOUT_MILLIS);
+            page.route("**/*", route -> handleSubresource(route));
+            page.navigate(safeUrl.toString());
 
-        return withPage(url, page -> {
-            Files.writeString(
-                    target,
-                    page.content(),
-                    StandardCharsets.UTF_8
-            );
+            String html = page.content();
+            int htmlBytes = html.getBytes(StandardCharsets.UTF_8).length;
+            if (htmlBytes > MAX_HTML_BYTES) {
+                throw new NavigationLimitException(
+                        "渲染后的 HTML 超过大小限制"
+                );
+            }
+
+            Path target = outputPath.toAbsolutePath().normalize();
+            Path parent = target.getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
+            Files.writeString(target, html, StandardCharsets.UTF_8);
             return target;
-        });
+        } catch (NavigationLimitException exception) {
+            throw exception;
+        } catch (Exception exception) {
+            throw new IllegalStateException(
+                    "安全网页捕获失败: " + url,
+                    exception
+            );
+        }
     }
 
     @Override
@@ -57,11 +96,10 @@ public class PlaywrightBrowserHtmlCapture
             String url,
             Path outputDirectory
     ) {
-        validateUrl(url);
+        validateBasicUrl(url);
+        URI safeUrl = safeNavigationClient.validateRedirectChain(url);
         if (outputDirectory == null) {
-            throw new IllegalArgumentException(
-                    "outputDirectory 不能为空"
-            );
+            throw new IllegalArgumentException("outputDirectory 不能为空");
         }
 
         Path directory = outputDirectory.toAbsolutePath().normalize();
@@ -72,64 +110,63 @@ public class PlaywrightBrowserHtmlCapture
 
         for (Path output : outputs) {
             if (Files.exists(output)) {
-                throw new IllegalStateException(
-                        "快照文件已存在，拒绝覆盖: " + output
-                );
+                throw new IllegalStateException("快照文件已存在，拒绝覆盖: " + output);
             }
         }
 
-        createDirectories(directory);
-
-        try {
-            return withPage(url, page -> {
-                Files.writeString(
-                        htmlPath,
-                        page.content(),
-                        StandardCharsets.UTF_8
-                );
-
-                // 先截图，再导出 PDF，避免打印介质影响截图样式。
-                page.screenshot(
-                        new Page.ScreenshotOptions()
-                                .setPath(screenshotPath)
-                                .setFullPage(true)
-                                .setType(ScreenshotType.PNG)
-                );
-
-                page.pdf(
-                        new Page.PdfOptions()
-                                .setPath(pdfPath)
-                                .setFormat("A4")
-                                .setPrintBackground(true)
-                );
-
-                return new BrowserCaptureArtifacts(
-                        htmlPath,
-                        pdfPath,
-                        screenshotPath
-                );
-            });
+        try (Playwright playwright = Playwright.create();
+             Browser browser = playwright.chromium().launch(
+                     new BrowserType.LaunchOptions().setHeadless(true));
+             BrowserContext context = browser.newContext(
+                     new Browser.NewContextOptions().setViewportSize(1280, 720));
+             Page page = context.newPage()) {
+            context.setDefaultTimeout(NAVIGATION_TIMEOUT_MILLIS);
+            page.route("**/*", this::handleSubresource);
+            page.navigate(safeUrl.toString());
+            String html = page.content();
+            ensureHtmlSize(html);
+            Files.createDirectories(directory);
+            Files.writeString(htmlPath, html, StandardCharsets.UTF_8);
+            page.screenshot(new Page.ScreenshotOptions()
+                    .setPath(screenshotPath)
+                    .setFullPage(true)
+                    .setType(ScreenshotType.PNG));
+            page.pdf(new Page.PdfOptions()
+                    .setPath(pdfPath)
+                    .setFormat("A4")
+                    .setPrintBackground(true));
+            return new BrowserCaptureArtifacts(htmlPath, pdfPath, screenshotPath);
         } catch (RuntimeException exception) {
             deletePartialOutputs(outputs, exception);
             throw exception;
+        } catch (Exception exception) {
+            throw new IllegalStateException("安全网页快照失败: " + url, exception);
         }
     }
 
-    private void createParentDirectories(Path outputPath) {
-        Path parent = outputPath.getParent();
-        if (parent != null) {
-            createDirectories(parent);
-        }
-    }
-
-    private void createDirectories(Path directory) {
+    private void handleSubresource(Route route) {
         try {
-            Files.createDirectories(directory);
-        } catch (IOException exception) {
-            throw new IllegalStateException(
-                    "创建输出目录失败: " + directory,
-                    exception
-            );
+            safeUrlPolicy.validateAndResolve(route.request().url());
+            route.resume();
+        } catch (RuntimeException exception) {
+            route.abort();
+        }
+    }
+
+    private void validateBasicUrl(String url) {
+        if (url == null || url.isBlank()) {
+            throw new IllegalArgumentException("url 不能为空");
+        }
+        String normalized = url.strip().toLowerCase(Locale.ROOT);
+        if (!normalized.startsWith("http://")
+                && !normalized.startsWith("https://")) {
+            throw new IllegalArgumentException("仅允许 HTTP/HTTPS URL");
+        }
+    }
+
+    private void ensureHtmlSize(String html) {
+        if (html.getBytes(StandardCharsets.UTF_8).length > MAX_HTML_BYTES) {
+            throw new NavigationLimitException("渲染后的 HTML 超过大小限制");
         }
     }
 
@@ -137,67 +174,12 @@ public class PlaywrightBrowserHtmlCapture
             List<Path> outputs,
             RuntimeException originalFailure
     ) {
-        List<IOException> cleanupFailures = new ArrayList<>();
-
         for (Path output : outputs) {
             try {
                 Files.deleteIfExists(output);
-            } catch (IOException cleanFailure) {
-                cleanupFailures.add(cleanFailure);
+            } catch (IOException cleanupFailure) {
+                originalFailure.addSuppressed(cleanupFailure);
             }
         }
-
-        cleanupFailures.forEach(originalFailure::addSuppressed);
-    }
-
-    private <T> T withPage(String url, PageAction<T> action) {
-        try (
-                Playwright playwright = Playwright.create();
-                Browser browser = playwright.chromium().launch(
-                        new BrowserType.LaunchOptions().setHeadless(true)
-                );
-                BrowserContext context = browser.newContext(
-                        new Browser.NewContextOptions().setViewportSize(
-                                VIEWPORT_WIDTH,
-                                VIEWPORT_HEIGHT
-                        )
-                );
-                Page page = context.newPage();
-        ) {
-            page.setDefaultNavigationTimeout(
-                    NAVIGATION_TIMEOUT_MILLIS
-            );
-            page.navigate(url);
-            return action.apply(page);
-        } catch (IOException exception) {
-            throw new IllegalStateException(
-                    "快照文件操作失败",
-                    exception
-            );
-        } catch (RuntimeException exception) {
-            throw new IllegalStateException(
-                    "网页捕获失败" + url,
-                    exception
-            );
-        }
-    }
-
-    private void validateUrl(String url) {
-        if (url == null || url.isBlank()) {
-            throw new IllegalArgumentException("url 不能为空");
-        }
-
-        String normalized = url.trim().toLowerCase(Locale.ROOT);
-        if (!normalized.startsWith("http://")
-        && !normalized.startsWith("https://")) {
-            throw new IllegalArgumentException(
-                    "仅允许 HTTP/HTTPS URL"
-            );
-        }
-    }
-    
-    @FunctionalInterface
-    private interface PageAction<T> {
-        T apply(Page page) throws IOException;
     }
 }

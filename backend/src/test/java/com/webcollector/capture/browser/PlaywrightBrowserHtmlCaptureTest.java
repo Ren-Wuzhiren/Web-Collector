@@ -2,6 +2,9 @@ package com.webcollector.capture.browser;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import com.webcollector.capture.security.SafeNavigationClient;
+import com.webcollector.capture.security.SafeUrlPolicy;
+import com.webcollector.capture.security.UnsafeUrlException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -11,6 +14,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -33,18 +37,28 @@ class PlaywrightBrowserHtmlCaptureTest {
     private HttpServer httpServer;
     private ExecutorService httpExecutor;
     private AtomicInteger navigationCount;
+    private AtomicInteger blockedSubresourceCount;
     private PlaywrightBrowserHtmlCapture capture;
 
     @BeforeEach
     void setUp() throws IOException {
-        capture = new PlaywrightBrowserHtmlCapture();
+        capture = new PlaywrightBrowserHtmlCapture(
+                new LocalOnlyNavigationClient(),
+                new LocalOnlyUrlPolicy()
+        );
         navigationCount = new AtomicInteger();
+        blockedSubresourceCount = new AtomicInteger();
 
         httpServer = HttpServer.create(
                 new InetSocketAddress("localhost", 0),
                 0
         );
         httpServer.createContext("/dynamic", this::handleDynamicPage);
+        httpServer.createContext("/dynamic-with-blocked-resource", this::handlePageWithPrivateImage);
+        httpServer.createContext("/blocked-resource", exchange -> {
+            blockedSubresourceCount.incrementAndGet();
+            sendHtml(exchange, "blocked");
+        });
 
         httpExecutor = Executors.newFixedThreadPool(2);
         httpServer.setExecutor(httpExecutor);
@@ -184,6 +198,24 @@ class PlaywrightBrowserHtmlCaptureTest {
         assertThat(navigationCount.get()).isZero();
     }
 
+    // [测试意图] 验证 URL 安全策略拒绝的子资源被 Playwright route 中止。
+    @Test
+    void shouldAbortPrivateSubresourceAndKeepMainPageAvailable(
+            @TempDir Path tempDir
+    ) throws IOException {
+        Path outputPath = tempDir.resolve("archive.html");
+
+        Path saved = capture.capture(
+                localUrl("/dynamic-with-blocked-resource"),
+                outputPath
+        );
+
+        assertThat(Files.exists(saved)).isTrue();
+        assertThat(Files.readString(saved, StandardCharsets.UTF_8))
+                .contains("动态内容已渲染");
+        assertThat(blockedSubresourceCount.get()).isZero();
+    }
+
     // [测试意图] 验证不支持的 URL scheme 在启动浏览器前被拒绝。
     @Test
     void shouldRejectNonHttpUrl(@TempDir Path tempDir) {
@@ -235,6 +267,26 @@ class PlaywrightBrowserHtmlCaptureTest {
                 </html>
                 """;
 
+        sendHtml(exchange, body);
+    }
+
+    private void handlePageWithPrivateImage(HttpExchange exchange) {
+        navigationCount.incrementAndGet();
+        String body = """
+                <!doctype html>
+                <html><head><meta charset="UTF-8"></head>
+                <body>
+                    <div id="app">等待脚本执行</div>
+                    <img src="http://192.168.1.10/blocked-resource">
+                    <script>
+                        document.getElementById('app').textContent = '动态内容已渲染';
+                    </script>
+                </body></html>
+                """;
+        sendHtml(exchange, body);
+    }
+
+    private void sendHtml(HttpExchange exchange, String body) {
         byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
 
         try {
@@ -258,5 +310,38 @@ class PlaywrightBrowserHtmlCaptureTest {
         return "http://localhost:"
                 + httpServer.getAddress().getPort()
                 + path;
+    }
+
+    /** 仅允许本地夹具，避免 M4.1 回归测试被 M4.4 SSRF 预检拦截。 */
+    private static final class LocalOnlyNavigationClient
+            extends SafeNavigationClient {
+
+        private LocalOnlyNavigationClient() {
+            super(new SafeUrlPolicy());
+        }
+
+        @Override
+        public URI validateRedirectChain(String rawUrl) {
+            return URI.create(rawUrl);
+        }
+    }
+
+    private static final class LocalOnlyUrlPolicy extends SafeUrlPolicy {
+        @Override
+        public java.net.URI validateAndResolve(String rawUrl) {
+            java.net.URI uri = java.net.URI.create(rawUrl);
+            if ("192.168.1.10".equalsIgnoreCase(uri.getHost())) {
+                throw new UnsafeUrlException("测试拒绝私网子资源");
+            }
+            if (!"localhost".equalsIgnoreCase(uri.getHost())) {
+                throw new UnsafeUrlException("测试 URL 不是 localhost");
+            }
+            return uri;
+        }
+
+        @Override
+        public void validate(java.net.URI uri) {
+            validateAndResolve(uri.toString());
+        }
     }
 }
