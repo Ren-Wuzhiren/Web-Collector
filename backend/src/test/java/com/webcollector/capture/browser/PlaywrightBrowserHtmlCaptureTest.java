@@ -23,6 +23,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.microsoft.playwright.Page;
+
 import javax.imageio.ImageIO;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -243,6 +245,113 @@ class PlaywrightBrowserHtmlCaptureTest {
         ))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("outputDirectory");
+    }
+
+    // [测试意图] 验证单个格式失败不会删除另外两个已成功发布的文件。
+    @Test
+    void shouldKeepOtherArtifactsWhenHtmlExportFails(@TempDir Path tempDir) throws IOException {
+        capture = captureWithExporter(new FailingExporter("html"));
+
+        BrowserCaptureArtifacts result = capture.captureSnapshot(localUrl("/dynamic"), tempDir.resolve("partial"));
+
+        assertThat(result.html().isSuccess()).isFalse();
+        assertThat(result.pdf().isSuccess()).isTrue();
+        assertThat(result.screenshot().isSuccess()).isTrue();
+        assertThat(Files.exists(result.pdfPath())).isTrue();
+        assertThat(Files.exists(result.screenshotPath())).isTrue();
+        assertNoTemporaryFiles(tempDir.resolve("partial"));
+    }
+
+    // [测试意图] 验证 PDF 单独失败时 HTML 与截图仍然完成。
+    @Test
+    void shouldKeepHtmlAndScreenshotWhenPdfExportFails(@TempDir Path tempDir) throws IOException {
+        capture = captureWithExporter(new FailingExporter("pdf"));
+
+        BrowserCaptureArtifacts result = capture.captureSnapshot(localUrl("/dynamic"), tempDir.resolve("partial"));
+
+        assertThat(result.html().isSuccess()).isTrue();
+        assertThat(result.pdf().isSuccess()).isFalse();
+        assertThat(result.screenshot().isSuccess()).isTrue();
+        assertThat(result.hasUsableSnapshot()).isTrue();
+        assertThat(Files.exists(result.htmlPath())).isTrue();
+        assertThat(Files.exists(result.screenshotPath())).isTrue();
+        assertNoTemporaryFiles(tempDir.resolve("partial"));
+    }
+
+    // [测试意图] 验证截图失败时 HTML 与 PDF 不受影响。
+    @Test
+    void shouldKeepHtmlAndPdfWhenScreenshotExportFails(@TempDir Path tempDir) throws IOException {
+        capture = captureWithExporter(new FailingExporter("screenshot"));
+
+        BrowserCaptureArtifacts result = capture.captureSnapshot(localUrl("/dynamic"), tempDir.resolve("partial"));
+
+        assertThat(result.html().isSuccess()).isTrue();
+        assertThat(result.pdf().isSuccess()).isTrue();
+        assertThat(result.screenshot().isSuccess()).isFalse();
+        assertThat(result.hasUsableSnapshot()).isTrue();
+        assertThat(Files.exists(result.htmlPath())).isTrue();
+        assertThat(Files.exists(result.pdfPath())).isTrue();
+        assertNoTemporaryFiles(tempDir.resolve("partial"));
+    }
+
+    // [测试意图] 验证三种格式都失败时返回逐格式错误而不是伪造成功路径。
+    @Test
+    void shouldReturnThreeFormatFailuresWithoutPageLevelFailure(@TempDir Path tempDir) throws IOException {
+        capture = captureWithExporter(new FailingExporter("all"));
+
+        BrowserCaptureArtifacts result = capture.captureSnapshot(localUrl("/dynamic"), tempDir.resolve("failed"));
+
+        assertThat(result.html().isSuccess()).isFalse();
+        assertThat(result.pdf().isSuccess()).isFalse();
+        assertThat(result.screenshot().isSuccess()).isFalse();
+        assertThat(result.hasUsableSnapshot()).isFalse();
+        assertNoTemporaryFiles(tempDir.resolve("failed"));
+    }
+
+    private PlaywrightBrowserHtmlCapture captureWithExporter(PageArtifactExporter exporter) {
+        return new PlaywrightBrowserHtmlCapture(
+                new LocalOnlyNavigationClient(),
+                new LocalOnlyUrlPolicy(),
+                exporter
+        );
+    }
+
+    private void assertNoTemporaryFiles(Path directory) throws IOException {
+        try (var files = Files.list(directory)) {
+            assertThat(files.anyMatch(path -> path.getFileName().toString().contains(".tmp-"))).isFalse();
+        }
+    }
+
+    private static final class FailingExporter implements PageArtifactExporter {
+        private final String failure;
+
+        private FailingExporter(String failure) {
+            this.failure = failure;
+        }
+
+        @Override
+        public void writeHtml(Page page, Path target) throws Exception {
+            failIf("html");
+            Files.writeString(target, page.content(), StandardCharsets.UTF_8);
+        }
+
+        @Override
+        public void writePdf(Page page, Path target) throws Exception {
+            failIf("pdf");
+            Files.writeString(target, "pdf", StandardCharsets.UTF_8);
+        }
+
+        @Override
+        public void writeScreenshot(Page page, Path target) throws Exception {
+            failIf("screenshot");
+            Files.writeString(target, "png", StandardCharsets.UTF_8);
+        }
+
+        private void failIf(String format) {
+            if (failure.equals(format) || failure.equals("all")) {
+                throw new IllegalStateException(format + " export failed");
+            }
+        }
     }
 
     private void handleDynamicPage(HttpExchange exchange) {

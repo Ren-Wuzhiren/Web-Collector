@@ -1,7 +1,6 @@
 package com.webcollector.capture.browser;
 
 import com.microsoft.playwright.*;
-import com.microsoft.playwright.options.ScreenshotType;
 import com.webcollector.capture.security.NavigationLimitException;
 import com.webcollector.capture.security.SafeNavigationClient;
 import com.webcollector.capture.security.SafeUrlPolicy;
@@ -13,7 +12,6 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
@@ -28,21 +26,32 @@ public class PlaywrightBrowserHtmlCapture
 
     private final SafeUrlPolicy safeUrlPolicy;
     private final SafeNavigationClient safeNavigationClient;
+    private final PageArtifactExporter artifactExporter;
 
     @Autowired
     public PlaywrightBrowserHtmlCapture(
             SafeNavigationClient safeNavigationClient,
-            SafeUrlPolicy safeUrlPolicy
+            SafeUrlPolicy safeUrlPolicy,
+            PageArtifactExporter artifactExporter
     ) {
         this.safeNavigationClient = safeNavigationClient;
         this.safeUrlPolicy = safeUrlPolicy;
+        this.artifactExporter = artifactExporter;
+    }
+
+    public PlaywrightBrowserHtmlCapture(
+            SafeNavigationClient safeNavigationClient,
+            SafeUrlPolicy safeUrlPolicy
+    ) {
+        this(safeNavigationClient, safeUrlPolicy, new PlaywrightPageArtifactExporter());
     }
 
     /** 兼容 M4.1/M4.2 的直接测试构造方式。 */
     public PlaywrightBrowserHtmlCapture() {
         this(
                 new SafeNavigationClient(new SafeUrlPolicy()),
-                new SafeUrlPolicy()
+                new SafeUrlPolicy(),
+                new PlaywrightPageArtifactExporter()
         );
     }
 
@@ -123,25 +132,52 @@ public class PlaywrightBrowserHtmlCapture
             context.setDefaultTimeout(NAVIGATION_TIMEOUT_MILLIS);
             page.route("**/*", this::handleSubresource);
             page.navigate(safeUrl.toString());
-            String html = page.content();
-            ensureHtmlSize(html);
+            String renderedHtml = page.content();
+            ensureHtmlSize(renderedHtml);
             Files.createDirectories(directory);
-            Files.writeString(htmlPath, html, StandardCharsets.UTF_8);
-            page.screenshot(new Page.ScreenshotOptions()
-                    .setPath(screenshotPath)
-                    .setFullPage(true)
-                    .setType(ScreenshotType.PNG));
-            page.pdf(new Page.PdfOptions()
-                    .setPath(pdfPath)
-                    .setFormat("A4")
-                    .setPrintBackground(true));
-            return new BrowserCaptureArtifacts(htmlPath, pdfPath, screenshotPath);
+            ArtifactResult html = exportOne(page, htmlPath, "HTML", artifactExporter::writeHtml);
+            ArtifactResult pdf = exportOne(page, pdfPath, "PDF", artifactExporter::writePdf);
+            ArtifactResult screenshot = exportOne(page, screenshotPath, "截图", artifactExporter::writeScreenshot);
+            return new BrowserCaptureArtifacts(html, pdf, screenshot);
         } catch (RuntimeException exception) {
-            deletePartialOutputs(outputs, exception);
             throw exception;
         } catch (Exception exception) {
             throw new IllegalStateException("安全网页快照失败: " + url, exception);
         }
+    }
+
+    @FunctionalInterface
+    private interface ExportAction {
+        void write(Page page, Path target) throws Exception;
+    }
+
+    private ArtifactResult exportOne(Page page, Path target, String format, ExportAction action) {
+        Path temporary = target.resolveSibling(target.getFileName() + ".tmp-" + System.nanoTime());
+        try {
+            action.write(page, temporary);
+            moveWithoutOverwrite(temporary, target);
+            return ArtifactResult.succeeded(target);
+        } catch (Exception exception) {
+            try {
+                Files.deleteIfExists(temporary);
+            } catch (IOException cleanupFailure) {
+                exception.addSuppressed(cleanupFailure);
+            }
+            return ArtifactResult.failed("ARTIFACT_EXPORT_FAILED", format + " 导出失败: " + stableMessage(exception));
+        }
+    }
+
+    private void moveWithoutOverwrite(Path source, Path target) throws IOException {
+        try {
+            Files.move(source, target, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+        } catch (java.nio.file.AtomicMoveNotSupportedException exception) {
+            Files.move(source, target);
+        }
+    }
+
+    private String stableMessage(Exception exception) {
+        String message = exception.getMessage();
+        return message == null || message.isBlank() ? exception.getClass().getSimpleName() : message;
     }
 
     private void handleSubresource(Route route) {
@@ -170,16 +206,4 @@ public class PlaywrightBrowserHtmlCapture
         }
     }
 
-    private void deletePartialOutputs(
-            List<Path> outputs,
-            RuntimeException originalFailure
-    ) {
-        for (Path output : outputs) {
-            try {
-                Files.deleteIfExists(output);
-            } catch (IOException cleanupFailure) {
-                originalFailure.addSuppressed(cleanupFailure);
-            }
-        }
-    }
 }
