@@ -3,6 +3,7 @@ package com.webcollector.capture.content;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
+import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -12,6 +13,7 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 /** 从 HTML 中抽取正文并删除常见页面噪音。 */
+@Component
 public class ReadableContentExtractor {
 
     private static final List<String> NOISE_SELECTORS = List.of(

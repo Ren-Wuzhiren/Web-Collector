@@ -43,5 +43,7 @@ public final class SharedTestContainers {
                 () -> REDIS.getMappedPort(6379)
         );
         registry.add("spring.data.redis.password", () -> "");
+        // [测试隔离] 业务测试手动调用 Worker，避免后台调度消费夹具任务。
+        registry.add("app.capture.scheduler-enabled", () -> "false");
     }
 }

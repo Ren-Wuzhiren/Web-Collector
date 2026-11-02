@@ -56,6 +56,21 @@ class AssetStorageTest {
         assertThat(storage.resolve(promoted.key())).doesNotExist();
     }
 
+    // [测试意图] 验证抓取工作目录中的外部文件会被复制进资产根且原文件保留。
+    @Test
+    void shouldCopyExternalFileWithoutRemovingSource(@TempDir Path tempDir) throws Exception {
+        Path root = tempDir.resolve("assets");
+        AssetStorage storage = new AssetStorage(root.toString());
+        Path source = tempDir.resolve("capture-work/page.html");
+        Files.createDirectories(source.getParent());
+        Files.writeString(source, "<html>external</html>");
+
+        AssetStorage.StoredFile stored = storage.copyExternal(source, ".html");
+
+        assertThat(source).exists();
+        assertThat(storage.resolve(stored.key())).hasContent("<html>external</html>");
+    }
+
     // [测试意图] 验证不能通过 key 穿越到存储根目录之外。
     @Test
     void shouldRejectPathTraversal(@TempDir Path tempDir) throws Exception {

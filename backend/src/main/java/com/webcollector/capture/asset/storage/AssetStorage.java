@@ -65,6 +65,16 @@ public class AssetStorage {
         return metadata;
     }
 
+    public StoredFile copyExternal(Path source, String extension) throws IOException {
+        Path realSource = source.toRealPath();
+        if (!Files.isRegularFile(realSource)) {
+            throw new IllegalArgumentException("快照路径不是普通文件");
+        }
+        try (InputStream input = Files.newInputStream(realSource)) {
+            return write(input, extension);
+        }
+    }
+
     public void restore(String promotedKey, String originalKey) throws IOException {
         Path source = resolve(promotedKey);
         Path target = resolve(originalKey);

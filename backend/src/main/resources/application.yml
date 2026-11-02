@@ -30,6 +30,14 @@ logging:
 app:
   auth:
     registration-enabled: false
+  capture:
+    worker-id: ${CAPTURE_WORKER_ID:capture-worker-local}
+    lease-seconds: ${CAPTURE_LEASE_SECONDS:120}
+    work-root: ${CAPTURE_WORK_ROOT:./data/capture-work}
+    scheduler-enabled: ${CAPTURE_SCHEDULER_ENABLED:true}
+    poll-interval-ms: ${CAPTURE_POLL_INTERVAL_MS:5000}
+    initial-delay-ms: ${CAPTURE_INITIAL_DELAY_MS:10000}
+    batch-size: ${CAPTURE_BATCH_SIZE:10}
 
 sa-token:
   token-name: Authorization

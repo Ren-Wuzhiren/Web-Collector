@@ -40,6 +40,8 @@ public class Link {
 
     private String description;
 
+    private String textContent;
+
     // [Java] LocalDateTime 对应 DATETIME(3)，毫秒精度；UTC 语义由业务代码负责。
     private LocalDateTime createdAt;
 
@@ -107,6 +109,14 @@ public class Link {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public String getTextContent() {
+        return textContent;
+    }
+
+    public void setTextContent(String textContent) {
+        this.textContent = textContent;
     }
 
     public LocalDateTime getCreatedAt() {

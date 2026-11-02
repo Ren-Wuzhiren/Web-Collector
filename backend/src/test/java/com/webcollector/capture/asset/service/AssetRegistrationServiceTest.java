@@ -40,17 +40,20 @@ class AssetRegistrationServiceTest {
     private AssetCleanupService cleanupService;
 
     private AssetStorage storage;
+    private Path captureWorkRoot;
     private AssetRegistrationService service;
 
     @BeforeEach
     void setUp(@TempDir Path tempDir) throws IOException {
         storage = new AssetStorage(tempDir.resolve("assets").toString());
+        captureWorkRoot = tempDir.resolve("capture-work");
         service = new AssetRegistrationService(
                 assetMapper,
                 captureJobMapper,
                 storage,
                 cleanupService,
-                Clock.fixed(Instant.parse("2026-11-01T00:00:00Z"), ZoneOffset.UTC)
+                Clock.fixed(Instant.parse("2026-11-01T00:00:00Z"), ZoneOffset.UTC),
+                captureWorkRoot.toString()
         );
         CaptureJob job = new CaptureJob();
         job.setId(42L);
@@ -95,21 +98,52 @@ class AssetRegistrationServiceTest {
         verify(assetMapper, never()).insert(any(Asset.class));
     }
 
-    // [测试意图] 验证不存在的文件和存储根目录外的普通文件都不会登记。
+    // [测试意图] 验证缺失文件拒绝登记，而抓取工作目录中的外部文件会被复制入库。
     @Test
-    void shouldRejectMissingAndOutsideFiles(@TempDir Path tempDir) throws IOException {
+    void shouldRejectMissingFileAndCopyExternalCaptureFile(@TempDir Path tempDir)
+            throws IOException {
         Path root = storage.getRoot();
-        Path outside = tempDir.resolve("outside.html");
+        Path outside = captureWorkRoot.resolve("outside.html");
+        Files.createDirectories(outside.getParent());
         Files.writeString(outside, "outside");
 
         assertThatThrownBy(() -> service.register(
                 42L, AssetFormat.HTML, root.resolve("missing.html")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("普通文件");
-        assertThatThrownBy(() -> service.register(
-                42L, AssetFormat.HTML, outside))
+        Asset asset = service.register(42L, AssetFormat.HTML, outside);
+
+        assertThat(storage.resolve(asset.getStoragePath())).hasContent("outside");
+        assertThat(outside).hasContent("outside");
+        verify(assetMapper).insert(asset);
+    }
+
+    // [测试意图] 验证存储根与抓取工作目录之外的文件仍不能登记。
+    @Test
+    void shouldRejectExternalFileOutsideCaptureWorkRoot(@TempDir Path tempDir)
+            throws IOException {
+        Path outside = tempDir.resolve("private.html");
+        Files.writeString(outside, "private");
+
+        assertThatThrownBy(() -> service.register(42L, AssetFormat.HTML, outside))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("under storage root");
+                .hasMessageContaining("抓取工作目录");
+        verify(assetMapper, never()).insert(any(Asset.class));
+    }
+
+    // [测试意图] 验证同一任务同一格式重复登记时直接复用已有资产。
+    @Test
+    void shouldReuseExistingAssetForSameJobAndFormat(@TempDir Path tempDir) throws Exception {
+        Asset existing = new Asset();
+        existing.setId(99L);
+        when(assetMapper.findByJobAndFormat(42L, AssetFormat.HTML))
+                .thenReturn(java.util.Optional.of(existing));
+        Path source = captureWorkRoot.resolve("external.html");
+        Files.createDirectories(source.getParent());
+        Files.writeString(source, "external");
+
+        assertThat(service.register(42L, AssetFormat.HTML, source)).isSameAs(existing);
+
         verify(assetMapper, never()).insert(any(Asset.class));
     }
 

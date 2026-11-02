@@ -93,19 +93,25 @@ class AssetMapperTest {
         assertThat(loaded.getSha256()).isEqualTo(registered.getSha256());
     }
 
-    // [测试意图] 验证数据库唯一约束拒绝同一任务重复登记同一格式。
+    // [测试意图] 验证重复登记复用已有资产，数据库仍拒绝绕过服务写入重复格式。
     @Test
-    void shouldRejectDuplicateFormatForSameCaptureJob() throws IOException {
+    void shouldReuseDuplicateFormatAndKeepDatabaseConstraint() throws IOException {
         CaptureJob job = createJob("asset-duplicate");
         Path firstFile = STORAGE_ROOT.resolve("duplicate/first.html");
         Path secondFile = STORAGE_ROOT.resolve("duplicate/second.html");
         Files.createDirectories(firstFile.getParent());
         Files.writeString(firstFile, "first");
         Files.writeString(secondFile, "second");
-        assetRegistrationService.register(job.getId(), AssetFormat.HTML, firstFile);
+        Asset first = assetRegistrationService.register(
+                job.getId(), AssetFormat.HTML, firstFile);
 
-        assertThatThrownBy(() -> assetRegistrationService.register(
-                job.getId(), AssetFormat.HTML, secondFile))
+        Asset duplicate = assetRegistrationService.register(
+                job.getId(), AssetFormat.HTML, secondFile);
+
+        assertThat(duplicate.getId()).isEqualTo(first.getId());
+        assertThat(secondFile).exists();
+        assertThatThrownBy(() -> assetMapper.insert(
+                newAsset(job.getLinkId(), job.getId())))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
