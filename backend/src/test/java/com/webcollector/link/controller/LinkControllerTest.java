@@ -290,7 +290,7 @@ public class LinkControllerTest {
                 .andExpect(jsonPath("$.code").value("NOT_FOUND"));
     }
 
-    // [测试意图] 验证删除链接返回 200 和删除成功消息。
+    // [测试意图] 验证删除链接返回 202 和资产清理消息。
     @Test
     void shouldDeleteLink() throws Exception {
         mockMvc.perform(delete("/api/v1/links/9")
@@ -298,9 +298,9 @@ public class LinkControllerTest {
                                 RequestIdFilter.REQUEST_ID_HEADER,
                                 "req-link-005"
                         ))
-                .andExpect(status().isOk())
+                .andExpect(status().isAccepted())
                 .andExpect(jsonPath("$.message")
-                        .value("链接删除成功"))
+                        .value("链接已加入资产清理队列"))
                 .andExpect(jsonPath("$.requestId")
                         .value("req-link-005"));
 

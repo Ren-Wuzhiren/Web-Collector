@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.webcollector.auth.session.SessionTokenService;
 import com.webcollector.capture.dto.CaptureJobSummary;
+import com.webcollector.capture.asset.service.AssetCleanupService;
 import com.webcollector.capture.entity.CaptureJobStatus;
 import com.webcollector.capture.service.CaptureJobService;
 import com.webcollector.collection.mapper.LinkCollectionMapper;
@@ -59,6 +60,7 @@ public class LinkServiceTest {
     private TagMapper tagMapper;
     private LinkTagMapper linkTagMapper;
     private CaptureJobService captureJobService;
+    private AssetCleanupService assetCleanupService;
     private SessionTokenService sessionTokenService;
     private LinkService linkService;
 
@@ -76,6 +78,7 @@ public class LinkServiceTest {
         tagMapper = mock(TagMapper.class);
         linkTagMapper = mock(LinkTagMapper.class);
         captureJobService = mock(CaptureJobService.class);
+        assetCleanupService = mock(AssetCleanupService.class);
 
         Clock clock = Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC);
 
@@ -85,6 +88,7 @@ public class LinkServiceTest {
                 tagMapper,
                 linkTagMapper,
                 captureJobService,
+                assetCleanupService,
                 sessionTokenService,
                 clock
         );
@@ -371,6 +375,7 @@ public class LinkServiceTest {
 
         linkService.deleteLink(10L);
 
+        verify(assetCleanupService).enqueueForLink(10L);
         verify(linkMapper).deleteById(10L);
     }
 

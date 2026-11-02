@@ -93,8 +93,9 @@ public class LinkController {
     }
 
     @DeleteMapping("/{id}")
-    public ApiResponse<Void> deleteLink(@PathVariable Long id) {
+    public ResponseEntity<ApiResponse<Void>> deleteLink(@PathVariable Long id) {
         linkService.deleteLink(id);
-        return ApiResponse.success(null, "链接删除成功");
+        return ResponseEntity.status(HttpStatus.ACCEPTED)
+                .body(ApiResponse.success(null, "链接已加入资产清理队列"));
     }
 }

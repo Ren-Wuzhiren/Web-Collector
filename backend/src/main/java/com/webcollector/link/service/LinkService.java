@@ -3,6 +3,7 @@ package com.webcollector.link.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.webcollector.auth.session.SessionTokenService;
 import com.webcollector.capture.dto.CaptureJobSummary;
+import com.webcollector.capture.asset.service.AssetCleanupService;
 import com.webcollector.capture.service.CaptureJobService;
 import com.webcollector.link.dto.LinkCreationResponse;
 import com.webcollector.collection.entity.LinkCollection;
@@ -38,6 +39,7 @@ public class LinkService {
     private final TagMapper tagMapper;
     private final LinkTagMapper linkTagMapper;
     private final CaptureJobService captureJobService;
+    private final AssetCleanupService assetCleanupService;
     private final SessionTokenService sessionTokenService;
     private final Clock clock;
 
@@ -47,6 +49,7 @@ public class LinkService {
             TagMapper tagMapper,
             LinkTagMapper linkTagMapper,
             CaptureJobService captureJobService,
+            AssetCleanupService assetCleanupService,
             SessionTokenService sessionTokenService,
             Clock clock
     ) {
@@ -55,6 +58,7 @@ public class LinkService {
         this.tagMapper = tagMapper;
         this.linkTagMapper = linkTagMapper;
         this.captureJobService = captureJobService;
+        this.assetCleanupService = assetCleanupService;
         this.sessionTokenService = sessionTokenService;
         this.clock = clock;
     }
@@ -161,6 +165,9 @@ public class LinkService {
         // [软件工程] 也可以把所有权条件直接拼进 DELETE 一条语句完成，这里保持和
         // TagService、CollectionService 一致的两步写法，便于对照阅读。
         Link link = requireOwnedLink(linkId, userId);
+
+        // [一致性] 清理路径与链接删除处于同一事务，FK 级联删掉 asset 行后仍可重试删文件。
+        assetCleanupService.enqueueForLink(link.getId());
 
         // [业务] 链接身上的标签关联不用手工清理：link_tag.link_id 的外键是
         // ON DELETE CASCADE，数据库会跟着删。
