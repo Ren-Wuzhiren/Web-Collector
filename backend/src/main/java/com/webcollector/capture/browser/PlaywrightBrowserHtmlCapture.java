@@ -1,7 +1,6 @@
 package com.webcollector.capture.browser;
 
 import com.microsoft.playwright.*;
-import com.microsoft.playwright.options.ScreenshotType;
 import com.webcollector.capture.security.NavigationLimitException;
 import com.webcollector.capture.security.SafeNavigationClient;
 import com.webcollector.capture.security.SafeUrlPolicy;
@@ -13,7 +12,6 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
@@ -28,14 +26,24 @@ public class PlaywrightBrowserHtmlCapture
 
     private final SafeUrlPolicy safeUrlPolicy;
     private final SafeNavigationClient safeNavigationClient;
+    private final SnapshotFormatExporter formatExporter;
 
     @Autowired
     public PlaywrightBrowserHtmlCapture(
             SafeNavigationClient safeNavigationClient,
             SafeUrlPolicy safeUrlPolicy
     ) {
+        this(safeNavigationClient, safeUrlPolicy, SnapshotFormatExporter.production());
+    }
+
+    PlaywrightBrowserHtmlCapture(
+            SafeNavigationClient safeNavigationClient,
+            SafeUrlPolicy safeUrlPolicy,
+            SnapshotFormatExporter formatExporter
+    ) {
         this.safeNavigationClient = safeNavigationClient;
         this.safeUrlPolicy = safeUrlPolicy;
+        this.formatExporter = formatExporter;
     }
 
     /** 兼容 M4.1/M4.2 的直接测试构造方式。 */
@@ -97,20 +105,21 @@ public class PlaywrightBrowserHtmlCapture
             Path outputDirectory
     ) {
         validateBasicUrl(url);
-        URI safeUrl = safeNavigationClient.validateRedirectChain(url);
+
         if (outputDirectory == null) {
             throw new IllegalArgumentException("outputDirectory 不能为空");
         }
 
+        URI safeUrl = safeNavigationClient.validateRedirectChain(url);
         Path directory = outputDirectory.toAbsolutePath().normalize();
-        Path htmlPath = directory.resolve("page.html");
-        Path pdfPath = directory.resolve("page.pdf");
-        Path screenshotPath = directory.resolve("screenshot.png");
-        List<Path> outputs = List.of(htmlPath, pdfPath, screenshotPath);
+        Path html = directory.resolve("page.html");
+        Path pdf = directory.resolve("page.pdf");
+        Path screenshot = directory.resolve("screenshot.png");
 
-        for (Path output : outputs) {
-            if (Files.exists(output)) {
-                throw new IllegalStateException("快照文件已存在，拒绝覆盖: " + output);
+
+        for (Path path : List.of(html, pdf, screenshot)) {
+            if (Files.exists(path)) {
+                throw new IllegalStateException("快照文件已存在，拒绝覆盖: " + path);
             }
         }
 
@@ -123,24 +132,24 @@ public class PlaywrightBrowserHtmlCapture
             context.setDefaultTimeout(NAVIGATION_TIMEOUT_MILLIS);
             page.route("**/*", this::handleSubresource);
             page.navigate(safeUrl.toString());
-            String html = page.content();
-            ensureHtmlSize(html);
+            String renderedHtml = page.content();
+            ensureHtmlSize(renderedHtml);
             Files.createDirectories(directory);
-            Files.writeString(htmlPath, html, StandardCharsets.UTF_8);
-            page.screenshot(new Page.ScreenshotOptions()
-                    .setPath(screenshotPath)
-                    .setFullPage(true)
-                    .setType(ScreenshotType.PNG));
-            page.pdf(new Page.PdfOptions()
-                    .setPath(pdfPath)
-                    .setFormat("A4")
-                    .setPrintBackground(true));
-            return new BrowserCaptureArtifacts(htmlPath, pdfPath, screenshotPath);
-        } catch (RuntimeException exception) {
-            deletePartialOutputs(outputs, exception);
+
+            CaptureFormatResult htmlResult = writeHtml(html, renderedHtml);
+            CaptureFormatResult screenshotResult = writeScreenshot(page, screenshot);
+            CaptureFormatResult pdfResult = writePdf(page, pdf);
+            return new BrowserCaptureArtifacts(htmlResult, pdfResult, screenshotResult);
+        } catch (NavigationLimitException exception) {
             throw exception;
         } catch (Exception exception) {
-            throw new IllegalStateException("安全网页快照失败: " + url, exception);
+            throw new IllegalStateException("安全网页导航失败: " + url, exception);
+        }
+    }
+
+    private void ensureHtmlSize(String html) {
+        if (html.getBytes(StandardCharsets.UTF_8).length > MAX_HTML_BYTES) {
+            throw new NavigationLimitException("渲染后的 HTML 超过大小限制");
         }
     }
 
@@ -164,22 +173,48 @@ public class PlaywrightBrowserHtmlCapture
         }
     }
 
-    private void ensureHtmlSize(String html) {
-        if (html.getBytes(StandardCharsets.UTF_8).length > MAX_HTML_BYTES) {
-            throw new NavigationLimitException("渲染后的 HTML 超过大小限制");
+    private CaptureFormatResult writeHtml(Path path, String html) {
+        try {
+            formatExporter.exportHtml(html, path);
+            return CaptureFormatResult.success(CaptureFormat.HTML, path);
+        } catch (Exception exception) {
+            deleteQuietly(path, exception);
+            return CaptureFormatResult.failed(CaptureFormat.HTML, messageOf(exception));
         }
     }
 
-    private void deletePartialOutputs(
-            List<Path> outputs,
-            RuntimeException originalFailure
-    ) {
-        for (Path output : outputs) {
-            try {
-                Files.deleteIfExists(output);
-            } catch (IOException cleanupFailure) {
-                originalFailure.addSuppressed(cleanupFailure);
-            }
+    private CaptureFormatResult writeScreenshot(Page page, Path path) {
+        try {
+            formatExporter.exportScreenshot(page, path);
+            return CaptureFormatResult.success(CaptureFormat.SCREENSHOT, path);
+        } catch (Exception exception) {
+            deleteQuietly(path, exception);
+            return CaptureFormatResult.failed(CaptureFormat.SCREENSHOT, messageOf(exception));
         }
+    }
+
+    private CaptureFormatResult writePdf(Page page, Path path) {
+
+        try {
+            formatExporter.exportPdf(page, path);
+            return CaptureFormatResult.success(CaptureFormat.PDF, path);
+        } catch (Exception exception) {
+            deleteQuietly(path, exception);
+            return CaptureFormatResult.failed(CaptureFormat.PDF, messageOf(exception));
+        }
+    }
+
+    private void deleteQuietly(Path path, Exception original) {
+        try {
+            Files.deleteIfExists(path);
+        } catch (IOException cleanupFailure) {
+            original.addSuppressed(cleanupFailure);
+        }
+    }
+
+    private String messageOf(Exception exception) {
+        return exception.getMessage() == null
+                ? exception.getClass().getSimpleName()
+                : exception.getMessage();
     }
 }

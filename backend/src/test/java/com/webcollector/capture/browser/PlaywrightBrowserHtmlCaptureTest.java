@@ -124,32 +124,35 @@ class PlaywrightBrowserHtmlCaptureTest {
                 outputDirectory
         );
 
-        assertThat(artifacts.htmlPath()).isEqualTo(
+        assertThat(artifacts.html().status()).isEqualTo(CaptureFormatStatus.SUCCESS);
+        assertThat(artifacts.pdf().status()).isEqualTo(CaptureFormatStatus.SUCCESS);
+        assertThat(artifacts.screenshot().status()).isEqualTo(CaptureFormatStatus.SUCCESS);
+        assertThat(artifacts.html().path()).isEqualTo(
                 outputDirectory.resolve("page.html")
                         .toAbsolutePath()
                         .normalize()
         );
-        assertThat(artifacts.pdfPath()).isEqualTo(
+        assertThat(artifacts.pdf().path()).isEqualTo(
                 outputDirectory.resolve("page.pdf")
                         .toAbsolutePath()
                         .normalize()
         );
-        assertThat(artifacts.screenshotPath()).isEqualTo(
+        assertThat(artifacts.screenshot().path()).isEqualTo(
                 outputDirectory.resolve("screenshot.png")
                         .toAbsolutePath()
                         .normalize()
         );
 
-        assertThat(Files.size(artifacts.htmlPath())).isPositive();
-        assertThat(Files.size(artifacts.pdfPath())).isPositive();
-        assertThat(Files.size(artifacts.screenshotPath())).isPositive();
+        assertThat(Files.size(artifacts.html().path())).isPositive();
+        assertThat(Files.size(artifacts.pdf().path())).isPositive();
+        assertThat(Files.size(artifacts.screenshot().path())).isPositive();
 
         assertThat(Files.readString(
-                artifacts.htmlPath(),
+                artifacts.html().path(),
                 StandardCharsets.UTF_8
         )).contains("动态内容已渲染");
 
-        byte[] pdfBytes = Files.readAllBytes(artifacts.pdfPath());
+        byte[] pdfBytes = Files.readAllBytes(artifacts.pdf().path());
         assertThat(new String(
                 pdfBytes,
                 0,
@@ -158,17 +161,56 @@ class PlaywrightBrowserHtmlCaptureTest {
         )).isEqualTo("%PDF-");
 
         byte[] screenshotBytes = Files.readAllBytes(
-                artifacts.screenshotPath()
+                artifacts.screenshot().path()
         );
         assertThat(Arrays.copyOf(screenshotBytes, PNG_SIGNATURE.length))
                 .containsExactly(PNG_SIGNATURE);
 
         var screenshot = ImageIO.read(
-                artifacts.screenshotPath().toFile()
+                artifacts.screenshot().path().toFile()
         );
         assertThat(screenshot).isNotNull();
         assertThat(screenshot.getHeight()).isGreaterThan(720);
         assertThat(navigationCount.get()).isEqualTo(1);
+    }
+
+    // [测试意图] 验证 HTML 导出失败时 PDF 和截图仍然保留。
+    @Test
+    void shouldKeepOtherArtifactsWhenHtmlExportFails(@TempDir Path tempDir)
+            throws IOException {
+        BrowserCaptureArtifacts artifacts = captureWithFailure(
+                tempDir.resolve("html-failure"), CaptureFormat.HTML);
+
+        assertFailed(artifacts.html(), CaptureFormat.HTML,
+                tempDir.resolve("html-failure/page.html"));
+        assertSuccessFile(artifacts.pdf());
+        assertSuccessFile(artifacts.screenshot());
+    }
+
+    // [测试意图] 验证 PDF 导出失败时 HTML 和截图仍然保留。
+    @Test
+    void shouldKeepOtherArtifactsWhenPdfExportFails(@TempDir Path tempDir)
+            throws IOException {
+        BrowserCaptureArtifacts artifacts = captureWithFailure(
+                tempDir.resolve("pdf-failure"), CaptureFormat.PDF);
+
+        assertSuccessFile(artifacts.html());
+        assertFailed(artifacts.pdf(), CaptureFormat.PDF,
+                tempDir.resolve("pdf-failure/page.pdf"));
+        assertSuccessFile(artifacts.screenshot());
+    }
+
+    // [测试意图] 验证截图导出失败时 HTML 和 PDF 仍然保留。
+    @Test
+    void shouldKeepOtherArtifactsWhenScreenshotExportFails(@TempDir Path tempDir)
+            throws IOException {
+        BrowserCaptureArtifacts artifacts = captureWithFailure(
+                tempDir.resolve("screenshot-failure"), CaptureFormat.SCREENSHOT);
+
+        assertSuccessFile(artifacts.html());
+        assertSuccessFile(artifacts.pdf());
+        assertFailed(artifacts.screenshot(), CaptureFormat.SCREENSHOT,
+                tempDir.resolve("screenshot-failure/screenshot.png"));
     }
 
     // [测试意图] 验证目标文件冲突时拒绝覆盖已有快照文件。
@@ -310,6 +352,66 @@ class PlaywrightBrowserHtmlCaptureTest {
         return "http://localhost:"
                 + httpServer.getAddress().getPort()
                 + path;
+    }
+
+    private BrowserCaptureArtifacts captureWithFailure(
+            Path outputDirectory,
+            CaptureFormat failedFormat
+    ) {
+        SnapshotFormatExporter delegate = SnapshotFormatExporter.production();
+        SnapshotFormatExporter failingExporter = new SnapshotFormatExporter() {
+            @Override
+            public void exportHtml(String html, Path path) {
+                if (failedFormat == CaptureFormat.HTML) {
+                    throw new IllegalStateException("模拟 HTML 导出失败");
+                }
+                delegate.exportHtml(html, path);
+            }
+
+            @Override
+            public void exportPdf(com.microsoft.playwright.Page page, Path path) {
+                if (failedFormat == CaptureFormat.PDF) {
+                    throw new IllegalStateException("模拟 PDF 导出失败");
+                }
+                delegate.exportPdf(page, path);
+            }
+
+            @Override
+            public void exportScreenshot(com.microsoft.playwright.Page page, Path path) {
+                if (failedFormat == CaptureFormat.SCREENSHOT) {
+                    throw new IllegalStateException("模拟截图导出失败");
+                }
+                delegate.exportScreenshot(page, path);
+            }
+        };
+        PlaywrightBrowserHtmlCapture failingCapture =
+                new PlaywrightBrowserHtmlCapture(
+                        new LocalOnlyNavigationClient(),
+                        new LocalOnlyUrlPolicy(),
+                        failingExporter
+                );
+        return failingCapture.captureSnapshot(
+                localUrl("/dynamic"), outputDirectory);
+    }
+
+    private void assertSuccessFile(CaptureFormatResult result) throws IOException {
+        assertThat(result.status()).isEqualTo(CaptureFormatStatus.SUCCESS);
+        assertThat(result.path()).isNotNull();
+        assertThat(result.errorMessage()).isNull();
+        assertThat(Files.exists(result.path())).isTrue();
+        assertThat(Files.size(result.path())).isPositive();
+    }
+
+    private void assertFailed(
+            CaptureFormatResult result,
+            CaptureFormat expectedFormat,
+            Path expectedPath
+    ) {
+        assertThat(result.format()).isEqualTo(expectedFormat);
+        assertThat(result.status()).isEqualTo(CaptureFormatStatus.FAILED);
+        assertThat(result.path()).isNull();
+        assertThat(result.errorMessage()).isNotBlank();
+        assertThat(Files.exists(expectedPath)).isFalse();
     }
 
     /** 仅允许本地夹具，避免 M4.1 回归测试被 M4.4 SSRF 预检拦截。 */
