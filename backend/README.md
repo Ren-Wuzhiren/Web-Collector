@@ -1,6 +1,6 @@
 # Backend
 
-后端目录预留给阶段 1 及之后的 Java 代码。
+Spring Boot 后端已实现收藏、任务、采集、资产和搜索的主要开发链路。
 
 实现约定：
 
@@ -9,16 +9,7 @@
 - 后端业务代码由用户亲手实现，Codex 先讲解再审查。
 - 开始编码前先阅读 `docs/工程化文档/04-技术选型与架构.md`、`05-数据库设计.md` 和 `06-接口设计.md`。
 
-当前已创建 Maven 骨架，但尚未实现任何鉴权业务。
-
-## 当前结构
-
-```text
-backend/
-  pom.xml
-  src/main/java/com/webcollector/WebCollectorApplication.java
-  src/main/resources/application.yml
-```
+当前状态（2026-11-02）：`mvn -pl backend test` 共 324 项通过，0 失败、0 错误、4 跳过。真实 MySQL 8.4 执行 V1-V14，Redis 7.4 用于会话集成测试。
 
 ## 已锁定依赖
 
@@ -29,5 +20,14 @@ backend/
 - Spring Boot Actuator、springdoc OpenAPI
 - Spring Boot Test、Testcontainers
 
-阶段 1.2 开始由用户亲手实现 profile、数据源、Flyway、统一响应与健康检查。
+已实现能力：
+
+- 注册、登录、会话、集合、标签、链接与所有权隔离。
+- `capture_job` 状态机、并发领取、重试、租约恢复。
+- Playwright HTML/PDF/截图、SSRF 防护、正文抽取与持久化。
+- 手工 `runOnce()` 和默认调度入口，三格式资产登记。
+- 资产授权读取、删除和持久化清理重试。
+- MySQL ngram 中英文全文搜索。
+
+尚未完成 Vue 前端、应用容器化/Nginx、任务查询 HTTP 接口和真实网页 MVP 数据集验收。
 

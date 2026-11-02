@@ -4,10 +4,12 @@
 
 ## 当前状态
 
-- 阶段：阶段 0 工程基线已完成，阶段 1 用户与鉴权已完成；阶段 2 中 `M2.1` 至 `M2.5` 已完成，下一项为 `M2.6` 创建抓取任务。
-- 后端已建立 Maven 骨架、本地 profile、Flyway、统一响应与异常、健康检查、`app_user` 迁移、MyBatis-Plus 映射、BCrypt、Redis 持久化 Sa-Token 会话、注册、登录、当前用户和退出。
-- `mvn -pl backend test` 全量测试 204 项通过，包含真实 MySQL 8.4、Redis 7.4 Testcontainers 集成测试；V1–V8 Flyway 迁移已在 MySQL 8.4 验证。
-- 注册、登录、`/me` 和退出接口均已完成；真实会话生命周期已验证。
+- 当前阶段：M6 检索与阅读 API；M6.1 中英文全文检索已完成工程和自动化验收，下一步 M6.2。
+- 后端已实现鉴权、集合、标签、链接、持久化任务、真实 Capture Worker、HTML/PDF/截图资产、正文抽取与搜索。
+- `mvn -pl backend test` 全量测试 324 项通过，0 失败、0 错误、4 跳过；真实 MySQL 8.4 执行 V1-V14，Redis 7.4 集成正常。
+- 自动调度默认启用：Worker 领取任务后生成三格式快照、登记成功资产、写入正文并完成/失败收尾。
+- `GET /api/v1/search?q=...` 使用 ngram FULLTEXT，强制按当前用户隔离。
+- Vue 前端、应用容器化/Nginx、任务查询 HTTP 接口、CI、备份恢复和 M9 真实网页验收尚未开始。
 - 上游 web/worker 已在本地跑通，首页检查返回 HTTP 200；上游源码仍只用于研究和对照。
 - 参考源码固定在 Linkwarden `v2.16.3`，只用于研究和对照，不直接进入本项目提交。
 

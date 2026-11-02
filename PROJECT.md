@@ -6,10 +6,12 @@
 
 ## 当前阶段
 
-- 阶段：M4.4 SSRF 与资源限制已完成工程实现和自动化验收；学习验收待用户回答。
-- 上次完成：增加 SSRF 地址检查、逐跳重定向复检、流式响应限制和 Playwright 子资源拦截；全量测试 266 项通过。
-- 下一步：完成 M4.4 学习验收后进入 M4.5“让抓取失败时坏得体面”。
-- 本轮不做：资产表、搜索、前端、部署和 HTTP 任务查询。
+- 阶段：M6 检索与阅读 API；M6.1 中英文全文检索已完成工程与自动化验收。
+- 上次完成：真实 Capture Worker、自动调度、HTML/PDF/截图资产登记、正文落库、资产安全读取/清理和 V14 ngram 搜索。
+- 最新验证：`mvn -pl backend test` 共 324 项通过，0 失败、0 错误、4 跳过；真实 MySQL 8.4 执行 V1-V14，Redis 7.4 集成正常。
+- 下一步：M6.2 集合、标签、时间过滤与游标分页；随后 M6.3 清理正文阅读视图。
+- 待办：M2.6、M4.3、M4.4、M4.5 学习题仍待处理；前端、部署和真实网页 MVP 验收尚未开始。
+- 本轮不做前端、生产部署、任务查询 HTTP 接口或 M6.2/M6.3。
 
 ## 技术栈与版本
 
@@ -50,10 +52,13 @@ reference/linkwarden/                   本地上游参考，只读且不提交
 ## 核心数据与接口
 
 - 项目阶段总览：[docs/项目阶段说明.md](docs/项目阶段说明.md)。
-- 已落地表：`app_user`、`collection`、`tag`、`link`、`link_tag`、`capture_job`。
-- 核心接口：注册/登录；集合、标签、链接 CRUD；链接标签关联。
+- 已落库表：`app_user`、`collection`、`tag`、`link`、`link_tag`、`capture_job`、`asset`、`asset_cleanup_job`；V1-V14 已在 MySQL 8.4 成功执行。
+- 核心接口：注册/登录；集合、标签、链接 CRUD；链接标签关联；资产授权读取/删除；`GET /api/v1/search?q=...`。
 - `POST /api/v1/links` 已完成 M2.6：在同一事务中创建链接、标签关联与 `PENDING capture_job`，响应包含 `{link, job}`。
 - 鉴权：`Authorization: Bearer <token>`。
+- 抓取：`CaptureWorkerScheduler` 默认每 5 秒领取最多 10 条任务；Worker 在独立 work root 中一次生成三格式快照，登记成功格式并写入正文。
+- 资产：`GET/DELETE /api/v1/assets/{id}`；链接或资产删除返回 `202`，文件清理由租约队列异步重试。
+- 搜索：标题、描述、正文使用 MySQL ngram FULLTEXT；结果强制按当前登录用户隔离。历史链接没有正文资产时需重新采集后才有正文。
 
 ## 完成定义
 
