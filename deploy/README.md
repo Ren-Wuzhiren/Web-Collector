@@ -12,6 +12,8 @@ docker compose --env-file deploy/.env -f deploy/docker-compose.yml ps
 
 3. 打开 `http://localhost:8080`。前端 Nginx 会把 `/api/` 转发给后端。
 
+首次创建账号后，把 `.env` 中的 `REGISTRATION_ENABLED` 改为 `false` 并重启 backend，避免公开部署时继续开放注册。
+
 数据卷：
 
 - `mysql_data`：MySQL 数据。
