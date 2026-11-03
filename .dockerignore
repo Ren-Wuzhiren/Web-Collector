@@ -1,0 +1,10 @@
+.git
+.github
+backend/target
+frontend/node_modules
+frontend/dist
+data
+reference
+docs
+*.log
+backend/playwright-classpath.txt
