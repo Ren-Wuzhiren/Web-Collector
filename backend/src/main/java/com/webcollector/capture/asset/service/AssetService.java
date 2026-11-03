@@ -2,6 +2,7 @@ package com.webcollector.capture.asset.service;
 
 import com.webcollector.capture.asset.entity.Asset;
 import com.webcollector.capture.asset.entity.AssetFormat;
+import com.webcollector.capture.asset.dto.AssetSummary;
 import com.webcollector.capture.asset.mapper.AssetMapper;
 import com.webcollector.capture.asset.storage.AssetStorage;
 import com.webcollector.capture.asset.service.AssetCleanupService;
@@ -12,6 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.time.ZoneOffset;
+import java.util.List;
 
 @Service
 public class AssetService {
@@ -52,6 +55,19 @@ public class AssetService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
         cleanupService.enqueue(asset.getStoragePath());
         assetMapper.deleteById(assetId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<AssetSummary> listOwnedByLink(long linkId, long userId) {
+        return assetMapper.findOwnedByLink(linkId, userId).stream()
+                .map(asset -> new AssetSummary(
+                        asset.getId(),
+                        asset.getFormat(),
+                        asset.getMimeType(),
+                        asset.getFileSizeBytes(),
+                        asset.getCreatedAt().toInstant(ZoneOffset.UTC)
+                ))
+                .toList();
     }
 
     public record AssetContent(

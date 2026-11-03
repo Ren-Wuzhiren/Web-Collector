@@ -17,6 +17,19 @@ import java.util.List;
  * @MapperScan("com.webcollector.**.mapper") 会扫到这个接口。
  */
 public interface CaptureJobMapper extends BaseMapper<CaptureJob> {
+    @Select("""
+            SELECT j.*
+            FROM capture_job j
+            INNER JOIN link l ON l.id = j.link_id
+            WHERE j.id = #{jobId}
+              AND l.user_id = #{userId}
+            LIMIT 1
+            """)
+    CaptureJob selectOwnedById(
+            @Param("jobId") Long jobId,
+            @Param("userId") Long userId
+    );
+
     /**
      * [业务] 查询下一条已经到期、可以领取的任务，并锁住这一行。
      *

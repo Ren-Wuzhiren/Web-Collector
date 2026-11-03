@@ -169,6 +169,12 @@ class CaptureWorkerIntegrationTest {
                         AssetFormat.PDF,
                         AssetFormat.SCREENSHOT
                 );
+        assertThat(captureJobMapper.selectOwnedById(jobId, link.getUserId()))
+                .isNotNull();
+        assertThat(captureJobMapper.selectOwnedById(jobId, -1L)).isNull();
+        assertThat(assetMapper.findOwnedByLink(link.getId(), link.getUserId()))
+                .hasSize(3);
+        assertThat(assetMapper.findOwnedByLink(link.getId(), -1L)).isEmpty();
     }
 
     // [测试意图] 验证真实状态机在抓取失败后增加尝试次数并安排重试。

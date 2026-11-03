@@ -25,6 +25,22 @@ public interface AssetMapper extends BaseMapper<Asset> {
             @Param("userId") long userId
     );
 
+    @Select("""
+            SELECT a.*
+            FROM asset a
+            INNER JOIN link l ON l.id = a.link_id
+            WHERE l.id = #{linkId}
+              AND l.user_id = #{userId}
+            ORDER BY a.id
+            """)
+    List<Asset> findOwnedByLink(
+            @Param("linkId") long linkId,
+            @Param("userId") long userId
+    );
+
+    @Select("SELECT * FROM asset WHERE capture_job_id = #{captureJobId} ORDER BY id")
+    List<Asset> findByCaptureJobId(@Param("captureJobId") long captureJobId);
+
     @Select("SELECT storage_path FROM asset WHERE link_id = #{linkId} ORDER BY id")
     List<String> selectStoragePathsByLink(@Param("linkId") long linkId);
 

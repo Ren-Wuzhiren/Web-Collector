@@ -1,6 +1,7 @@
 package com.webcollector.capture.asset.controller;
 
 import com.webcollector.auth.session.SessionTokenService;
+import com.webcollector.capture.asset.dto.AssetSummary;
 import com.webcollector.capture.asset.entity.AssetFormat;
 import com.webcollector.capture.asset.service.AssetService;
 import com.webcollector.common.web.BusinessException;
@@ -15,6 +16,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.List;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -95,5 +98,26 @@ class AssetControllerTest {
                 .andExpect(status().isAccepted())
                 .andExpect(jsonPath("$.message").value("资产已加入清理队列"));
         verify(assetService).deleteOwned(14L, 7L);
+    }
+
+    // [测试意图] 验证按链接列出资产元数据时只传入当前用户，不暴露文件内容。
+    @Test
+    void shouldListOwnedAssetsByLink() throws Exception {
+        when(assetService.listOwnedByLink(21L, 7L)).thenReturn(List.of(
+                new AssetSummary(
+                        3L,
+                        AssetFormat.PDF,
+                        "application/pdf",
+                        2048,
+                        Instant.parse("2026-11-02T00:00:00Z")
+                )
+        ));
+
+        mockMvc.perform(get("/api/v1/assets").param("linkId", "21"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].id").value(3))
+                .andExpect(jsonPath("$.data[0].format").value("PDF"))
+                .andExpect(jsonPath("$.data[0].storagePath").doesNotExist());
+        verify(assetService).listOwnedByLink(21L, 7L);
     }
 }

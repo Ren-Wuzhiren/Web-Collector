@@ -1,6 +1,7 @@
 package com.webcollector.capture.asset.controller;
 
 import com.webcollector.auth.session.SessionTokenService;
+import com.webcollector.capture.asset.dto.AssetSummary;
 import com.webcollector.capture.asset.service.AssetService;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.HttpHeaders;
@@ -12,7 +13,10 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/assets")
@@ -26,6 +30,14 @@ public class AssetController {
     ) {
         this.assetService = assetService;
         this.sessionTokenService = sessionTokenService;
+    }
+
+    @GetMapping
+    public ApiResponse<List<AssetSummary>> listByLink(@RequestParam("linkId") long linkId) {
+        return ApiResponse.success(assetService.listOwnedByLink(
+                linkId,
+                sessionTokenService.requireLoginId()
+        ));
     }
 
     @GetMapping("/{id}")
