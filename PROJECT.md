@@ -6,12 +6,12 @@
 
 ## 当前阶段
 
-- 阶段：M6 检索与阅读 API；M6.1 中英文全文检索已完成工程与自动化验收。
-- 上次完成：真实 Capture Worker、自动调度、HTML/PDF/截图资产登记、正文落库、资产安全读取/清理和 V14 ngram 搜索。
-- 最新验证：`mvn -pl backend test` 共 324 项通过，0 失败、0 错误、4 跳过；真实 MySQL 8.4 执行 V1-V14，Redis 7.4 集成正常。
-- 下一步：M6.2 集合、标签、时间过滤与游标分页；随后 M6.3 清理正文阅读视图。
-- 待办：M2.6、M4.3、M4.4、M4.5 学习题仍待处理；前端、部署和真实网页 MVP 验收尚未开始。
-- 本轮不做前端、生产部署、任务查询 HTTP 接口或 M6.2/M6.3。
+- 阶段：后端 M6.1 与基础 M7/M8 交付骨架已完成；完整 MVP 尚未通过真实网页验收。
+- 上次完成：真实 Capture Worker、自动调度、三格式资产、正文落库、任务/资产查询、V14 搜索、Vue 基础工作区和全栈部署骨架。
+- 最新验证：后端 `mvn -pl backend test` 327 项通过，0 失败、0 错误、4 跳过；前端 `npm ci && npm run build` 通过；Compose 配置解析通过。
+- 下一步：M6.2 过滤与分页、M6.3 阅读视图、浏览器端 E2E、解决 Docker 镜像拉取网络问题，并执行 30 个真实 URL 验收。
+- 待办：M2.6、M4.3、M4.4、M4.5、M6.1 学习题仍待处理。
+- 未验证：Docker 镜像实际构建（当前机器连接 Docker Hub 超时）、全栈容器启动、真实网页成功率与中位耗时。
 
 ## 技术栈与版本
 
@@ -22,9 +22,9 @@
 | 数据访问 | MyBatis-Plus | 3.5.17 |
 | 数据库 | MySQL | 8.4（Testcontainers 验收） |
 | 缓存/会话 | Redis + Sa-Token | Redis 7.4（Testcontainers 验收）/ Sa-Token 1.46.0 |
-| 前端 | Vue 3 | 尚未开始 |
+| 前端 | Vue 3 + Vite + Pinia + Element Plus | 基础工作区与生产构建通过 |
 | 构建 | Maven | 聚合工程，后端模块 `backend` |
-| 部署 | Docker Compose + Nginx | 后续阶段 |
+| 部署 | Docker Compose + Nginx | 配置已加入；容器构建受当前网络阻断 |
 
 ## 目录约定
 
@@ -59,6 +59,8 @@ reference/linkwarden/                   本地上游参考，只读且不提交
 - 抓取：`CaptureWorkerScheduler` 默认每 5 秒领取最多 10 条任务；Worker 在独立 work root 中一次生成三格式快照，登记成功格式并写入正文。
 - 资产：`GET/DELETE /api/v1/assets/{id}`；链接或资产删除返回 `202`，文件清理由租约队列异步重试。
 - 搜索：标题、描述、正文使用 MySQL ngram FULLTEXT；结果强制按当前登录用户隔离。历史链接没有正文资产时需重新采集后才有正文。
+- 查询：`GET /api/v1/jobs/{id}` 返回任务状态、错误和资产摘要；`GET /api/v1/assets?linkId=...` 返回当前用户链接的资产清单。
+- 部署：`deploy/docker-compose.yml` 编排 MySQL、Redis、后端和 Nginx 前端；CI、备份恢复和真实 URL 验收脚本已加入，容器运行尚未验证。
 
 ## 完成定义
 
