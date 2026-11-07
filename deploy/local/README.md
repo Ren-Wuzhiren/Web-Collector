@@ -11,6 +11,7 @@ docker compose -f deploy/local/docker-compose.yml ps
 
 - MySQL：`localhost:13307`
 - Redis：`localhost:6380`
+- 本地资产文件：`backend/data/assets`，不随启动目录变化
 
 从仓库根目录启动本地后端：
 

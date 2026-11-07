@@ -36,3 +36,6 @@ mybatis-plus:
 app:
   auth:
     registration-enabled: true
+  storage:
+    # 本地启动方式可能从仓库根目录或 backend 目录运行，必须固定资产根目录。
+    root: "${APP_STORAGE_ROOT:${user.dir}/backend/data/assets}"
