@@ -28,6 +28,51 @@ docker compose --env-file deploy/.env -f deploy/docker-compose.yml down
 
 不要添加 `-v`，除非明确要删除全部持久化数据。
 
+## 本地 demo 演示账号
+
+`demo` 默认是普通本地开发账号，不具备管理员权限或跨用户读取能力。它只用于人工检查登录、收藏、详情、正文、证据、搜索和标签页面，不参与自动化 E2E；Playwright 仍为每个用例创建随机唯一账号。
+
+先启动 MySQL、Redis 和 local profile 后端，然后使用 PowerShell 7 从仓库根目录运行：
+
+```powershell
+.\scripts\seed-demo-account.ps1
+```
+
+脚本默认连接 `http://127.0.0.1:8080`，创建或复用以下固定资源：
+
+- 账号：`demo` / `demo@example.com`；
+- 集合：`工程阅读`、`协议档案`；
+- 标签：`Web`、`HTTP`、`安全`、`Spring`、`Java`、`性能`；
+- 6 条公开网页抓取记录，覆盖正文与 HTML/PDF/截图证据。
+
+密码没有默认值。脚本会交互式询问；无交互环境需要预先提供 `WEBCOLLECTOR_DEMO_PASSWORD`。脚本不会保存或输出密码及 token。
+
+重复运行只补齐缺失资源，不删除或改写已有账号、集合、标签和链接；已有链接会按原始 URL 复用。任何任务失败都会在结束时列出并以非零状态退出，但不会删除已经成功的数据。
+
+脚本行为测试：
+
+```powershell
+node --test .\scripts\tests\seed-demo-account.test.mjs
+```
+
+### 提升本地 demo 为运营管理员
+
+仅在需要检查 `/admin` 运营页时运行：
+
+```powershell
+.\scripts\promote-demo-admin.ps1
+```
+
+脚本只操作 `deploy/local/docker-compose.yml` 对应的本地 MySQL，把 `demo.role` 从 `USER` 提升为 `ADMIN`。重复运行是幂等的，未知账号会失败。数据库凭据由容器环境读取，脚本不会输出密码。角色每次请求都从数据库读取，因此现有登录会话不需要重新登录。
+
+管理员可以查看跨账号聚合指标和失败任务元数据，包括用户名、来源域名、尝试次数和错误码；不能查看其他用户的完整 URL、标题、正文、错误原文或资产内容。管理员重试会创建新任务、清理旧失败任务的部分资产业务记录并写入持久审计。
+
+提升脚本测试：
+
+```powershell
+node --test .\scripts\tests\promote-demo-admin.test.mjs
+```
+
 ## 备份与恢复
 
 ```powershell

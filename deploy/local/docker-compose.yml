@@ -11,7 +11,7 @@ services:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-webcollector_root_dev}
       TZ: Asia/Shanghai
     ports:
-      - "3307:3306"
+      - "13307:3306"
     volumes:
       - webcollector_mysql_data:/var/lib/mysql
     command:

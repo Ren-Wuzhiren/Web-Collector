@@ -22,6 +22,15 @@ node_modules/
 dist/
 **/dist/
 
+# Playwright
+frontend/test-results/
+frontend/playwright-report/
+frontend/blob-report/
+
+# Local design and agent evidence
+.taste-skill/
+.planning/
+
 # Runtime data
 data/
 pgdata/
@@ -33,6 +42,10 @@ logs/
 .DS_Store
 Thumbs.db
 
-# Local personal tool config (not committed per AGENTS.md)
-.claude/settings.local.json
+# Local personal tool config and execution scratch (not committed per AGENTS.md)
+.claude/
 .codex/
+.superpowers/
+
+# Accidental local command-output artifact
+/tatus --short
