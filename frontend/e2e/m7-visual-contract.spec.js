@@ -167,3 +167,114 @@ test('收藏页使用顶部主导航和全局主题开关', async ({ page }) => 
     page.getByRole('navigation', { name: '移动端主导航' }),
   ).toBeVisible()
 })
+
+// [测试意图] 收藏页默认以视觉卡片网格呈现，列表模式可切换并在刷新后保留。
+test('收藏页默认卡片网格并持久化列表模式', async ({ page }) => {
+  const links = [
+    {
+      id: 41,
+      originalUrl: 'https://developer.mozilla.org/en-US/docs/Web/Security',
+      collectionId: 1,
+      title: 'Web security',
+      description: '浏览器安全与平台边界。',
+      createdAt: '2026-11-07T01:00:00Z',
+      updatedAt: '2026-11-07T01:02:00Z',
+    },
+    {
+      id: 42,
+      originalUrl: 'https://spring.io/projects/spring-boot',
+      collectionId: 1,
+      title: 'Spring Boot',
+      description: 'Spring Boot 官方项目资料。',
+      createdAt: '2026-11-07T02:00:00Z',
+      updatedAt: '2026-11-07T02:02:00Z',
+    },
+  ]
+
+  await page.goto('/login')
+  await page.evaluate(() => {
+    localStorage.setItem('webcollector-token', 'theme-grid-token')
+  })
+  await page.route('**/api/v1/auth/me', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        data: {
+          id: 7,
+          username: 'reader',
+          email: 'reader@example.com',
+          role: 'USER',
+          createdAt: '2026-11-07T00:00:00Z',
+        },
+        message: 'success',
+        requestId: 'theme-grid',
+      }),
+    })
+  })
+  await page.route('**/api/v1/collections', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        data: [
+          {
+            id: 1,
+            name: 'Inbox',
+            isInbox: true,
+            linkCount: 2,
+          },
+        ],
+        message: 'success',
+        requestId: 'theme-grid-collections',
+      }),
+    })
+  })
+  await page.route('**/api/v1/tags', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        data: [],
+        message: 'success',
+        requestId: 'theme-grid-tags',
+      }),
+    })
+  })
+  await page.route('**/api/v1/links', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        data: links,
+        message: 'success',
+        requestId: 'theme-grid-links',
+      }),
+    })
+  })
+
+  await page.goto('/links')
+
+  await expect(page.getByTestId('link-grid')).toBeVisible()
+  await expect(page.getByTestId('archive-card')).toHaveCount(2)
+  await expect(
+    page.getByRole('button', { name: '网格视图' }),
+  ).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByText('Web security', { exact: true })).toBeVisible()
+  await expect(page.getByText('Spring Boot', { exact: true })).toBeVisible()
+
+  await page.getByRole('button', { name: '列表视图' }).click()
+
+  await expect(page.getByTestId('link-grid')).toHaveCount(0)
+  await expect(page.getByTestId('link-list')).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: '列表视图' }),
+  ).toHaveAttribute('aria-pressed', 'true')
+  await expect
+    .poll(() => page.evaluate(() => localStorage.getItem('webcollector-link-view')))
+    .toBe('list')
+
+  await page.reload()
+  await expect(page.getByTestId('link-list')).toBeVisible()
+  await expect(page.getByTestId('link-grid')).toHaveCount(0)
+})
