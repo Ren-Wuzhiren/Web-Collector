@@ -6,12 +6,12 @@
 
 ## 当前阶段
 
-- 阶段：后端 M6.1 与基础 M7/M8 交付骨架已完成；完整 MVP 尚未通过真实网页验收。
-- 上次完成：真实 Capture Worker、自动调度、三格式资产、正文落库、任务/资产查询、V14 搜索、Vue 基础工作区和全栈部署骨架。
-- 最新验证：后端 `mvn -pl backend test` 327 项通过，0 失败、0 错误、4 跳过；前端 `npm ci && npm run build` 通过；Compose 配置解析通过。
-- 下一步：M6.2 过滤与分页、M6.3 阅读视图、浏览器端 E2E、解决 Docker 镜像拉取网络问题，并执行 30 个真实 URL 验收。
-- 待办：M2.6、M4.3、M4.4、M4.5、M6.1 学习题仍待处理。
-- 未验证：Docker 镜像实际构建（当前机器连接 Docker Hub 超时）、全栈容器启动、真实网页成功率与中位耗时。
+- 阶段：M7 工程与自动化验收完成，两道学习题待用户回答；M8.3.1 管理员角色与运营后台已完成，M8 部署运维尚未闭环。
+- 上次完成：Vue M7 阅读工作台、动效 I1–I5、生产 Preview E2E、五页三档视觉门禁，以及 USER/ADMIN 角色、管理员概览、失败任务重试、资产清理和持久审计。
+- 最新验证：后端 `mvn -pl backend test` 364 项通过，0 失败、0 错误、4 跳过；前端生产构建通过；完整 Playwright 27 项通过；视觉源码 lint 0 FAIL；M7 五页三档视觉门禁 0 FAIL。
+- 下一步：用户完成 M7 Q1/Q2；随后修复 Docker 镜像拉取，推进 M8.1 全栈容器、M8.2 备份恢复和 M8.3 限流。
+- 待办：M2.6、M4.3、M4.4、M4.5、M6.1、M6.2、M6.3 学习题仍待处理。
+- 未验证：Docker 镜像实际构建（当前机器解析 Docker Hub 元数据超时）、全栈容器启动、备份恢复、限流与真实网页成功率。
 
 ## 技术栈与版本
 
@@ -52,10 +52,11 @@ reference/linkwarden/                   本地上游参考，只读且不提交
 ## 核心数据与接口
 
 - 项目阶段总览：[docs/项目阶段说明.md](docs/项目阶段说明.md)。
-- 已落库表：`app_user`、`collection`、`tag`、`link`、`link_tag`、`capture_job`、`asset`、`asset_cleanup_job`；V1-V14 已在 MySQL 8.4 成功执行。
+- 已落库表：`app_user`、`collection`、`tag`、`link`、`link_tag`、`capture_job`、`asset`、`asset_cleanup_job`、`admin_action_log`；V1-V17 已在 MySQL 8.4 成功执行。
 - 核心接口：注册/登录；集合、标签、链接 CRUD；链接标签关联；资产授权读取/删除；`GET /api/v1/search?q=...`。
 - `POST /api/v1/links` 已完成 M2.6：在同一事务中创建链接、标签关联与 `PENDING capture_job`，响应包含 `{link, job}`。
-- 鉴权：`Authorization: Bearer <token>`。
+- 鉴权：`Authorization: Bearer <token>`；`app_user.role` 支持 `USER/ADMIN`，管理员角色每次请求从数据库读取。
+- 管理：`GET /api/v1/admin/overview`、`GET /api/v1/admin/capture-jobs/failed`、`POST /api/v1/admin/capture-jobs/{id}/retry`；不返回其他用户正文、完整 URL、错误原文或资产内容。
 - 抓取：`CaptureWorkerScheduler` 默认每 5 秒领取最多 10 条任务；Worker 在独立 work root 中一次生成三格式快照，登记成功格式并写入正文。
 - 资产：`GET/DELETE /api/v1/assets/{id}`；链接或资产删除返回 `202`，文件清理由租约队列异步重试。
 - 搜索：标题、描述、正文使用 MySQL ngram FULLTEXT；结果强制按当前登录用户隔离。历史链接没有正文资产时需重新采集后才有正文。
