@@ -511,7 +511,7 @@ function formatBytes(bytes) {
             <span aria-hidden="true">·</span>
             <span>{{ catalog.collectionName(link.collectionId) }}</span>
           </div>
-          <h1>{{ displayTitle }}</h1>
+          <h1 :style="{ 'view-transition-name': `link-title-${link.id}` }">{{ displayTitle }}</h1>
           <p v-if="link.description" class="detail-description">{{ link.description }}</p>
           <div class="readiness" :class="`is-${readiness.tone}`">
             <span class="readiness-mark" aria-hidden="true"></span>

@@ -1,0 +1,219 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  color-scheme: light;
+  background: var(--ground);
+}
+
+body {
+  min-width: 320px;
+  min-height: 100svh;
+  margin: 0;
+  color: var(--text);
+  background: var(--ground);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-ui);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 页面标题与区块标题统一用衬线，字重保持轻（400–500），靠字号和留白建立层级 */
+h1,
+h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+h1 {
+  font-size: var(--font-size-title);
+  line-height: var(--line-height-title);
+}
+
+h2 {
+  font-size: var(--font-size-section);
+  line-height: 1.3;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+button {
+  cursor: pointer;
+}
+
+a {
+  color: var(--accent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+img,
+svg {
+  max-width: 100%;
+}
+
+::selection {
+  color: var(--text);
+  background: var(--selection);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+#app {
+  min-height: 100svh;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  border: 0;
+  white-space: nowrap;
+}
+
+/* 按钮：胶囊形，主按钮为近黑底白字（参考站 "Try Claude" 样式） */
+.el-button {
+  min-height: var(--control-height);
+  padding: 0 18px;
+  border-radius: var(--radius-pill);
+  font-weight: 500;
+}
+
+.el-button--primary {
+  border-color: var(--text);
+  color: var(--surface);
+  background: var(--text);
+}
+
+.el-button--primary:hover,
+.el-button--primary:focus-visible {
+  border-color: var(--text-hover);
+  color: var(--surface);
+  background: var(--text-hover);
+}
+
+/* 输入框：10px 圆角、1px 描边，不用阴影；聚焦时描边变墨色 */
+.el-input__wrapper,
+.el-select__wrapper {
+  border-radius: var(--radius-control);
+  box-shadow: 0 0 0 1px var(--control) inset; /* taste-skill-ignore shadow */
+}
+
+.el-input__wrapper.is-focus,
+.el-select__wrapper.is-focused {
+  box-shadow: 0 0 0 1px var(--text) inset; /* taste-skill-ignore shadow */
+}
+
+.el-textarea__inner {
+  border-radius: var(--radius-control);
+  box-shadow: 0 0 0 1px var(--control) inset; /* taste-skill-ignore shadow */
+  resize: vertical;
+}
+
+.el-textarea__inner:focus {
+  box-shadow: 0 0 0 1px var(--text) inset; /* taste-skill-ignore shadow */
+}
+
+.el-overlay {
+  background: rgb(20 20 19 / 32%);
+}
+
+.el-drawer.save-drawer {
+  max-width: calc(100vw - 24px);
+  background: var(--surface);
+}
+
+.el-drawer__body {
+  padding: 0;
+}
+
+:root {
+  --el-font-family: var(--font-ui);
+  --el-text-color-primary: var(--text);
+  --el-text-color-regular: var(--text);
+  --el-text-color-secondary: var(--muted);
+  --el-border-color: var(--border);
+  --el-border-color-light: var(--rule);
+  --el-border-color-hover: var(--control);
+  --el-color-primary: var(--text);
+  --el-color-primary-light-3: #3d3d3a;
+  --el-color-primary-light-5: #6b6a66;
+  --el-color-primary-light-7: #a9a79f;
+  --el-color-primary-light-8: #c9c5b7;
+  --el-color-primary-light-9: var(--active);
+  --el-color-primary-dark-2: #000000;
+  --el-border-radius-base: var(--radius-control);
+  --el-border-radius-small: 6px;
+  --el-box-shadow-light: none; /* taste-skill-ignore shadow */
+  --el-box-shadow: none; /* taste-skill-ignore shadow */
+}
+
+@media (max-width: 900px) {
+  :root {
+    --page-pad: 16px;
+    --section-gap: 32px;
+    --font-size-title: 26px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+
+  /* View Transitions 的伪元素不在上面的通配选择器里，需要单独压短。 */
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation-duration: 0.01ms !important;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-group(*) {
+    animation-duration: var(--motion-standard);
+    animation-timing-function: var(--ease-out);
+  }
+
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: var(--motion-fast);
+    animation-timing-function: var(--ease-out);
+  }
+}

@@ -26,7 +26,11 @@ api.interceptors.response.use(
       error.response?.data?.message ||
       error.message ||
       '请求失败，请稍后重试'
-    return Promise.reject(new Error(message))
+    const normalizedError = new Error(message)
+    normalizedError.status = error.response?.status
+    normalizedError.code = error.response?.data?.code
+    normalizedError.requestId = error.response?.data?.requestId
+    return Promise.reject(normalizedError)
   },
 )
 

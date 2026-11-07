@@ -1,0 +1,65 @@
+:root {
+  /* 配色：暖白纸感底 + 近黑墨色文字 + 陶土主色。色值见 design.md §1 */
+  --ground: #f5f4ee;
+  --surface: #fbfaf6;
+  --raised: #efeee7;
+  --active: #e8e6dc;
+  --border: #dcd9cd;
+  --rule: #e8e6dc;
+  --control: #c9c5b7;
+  --control-hover: #a9a597;
+  --text: #141413;
+  --text-hover: #3d3d3a;
+  --muted: #5e5d59;
+  --faint: #87867f;
+  --accent: #c96442;
+  --accent-soft: #f5e6de;
+  --accent-strong: #a84f31;
+  --info: #3f6fa6;
+  --info-soft: #e6eef7;
+  --sage: #5f7a48;
+  --positive: #4f6b3a;
+  --positive-soft: #e7eedd;
+  --negative: #b3261e;
+  --negative-soft: #f9e6e3;
+  --negative-border: #ebc2bc;
+  --warning: #8a5a12;
+  --warning-soft: #faf0dc;
+  --selection: #f0d9cc;
+
+  /* 圆角：按钮用胶囊，面板 16px，输入框 10px */
+  --radius-panel: 16px;
+  --radius-control: 10px;
+  --radius-pill: 999px;
+
+  /* 布局尺寸 */
+  --sidebar-width: 248px;
+  --content-width: 1240px;
+  --gap: 16px;
+  --section-gap: 48px;
+  --page-pad: 40px;
+  --control-height: 40px;
+  --row-height: 68px;
+
+  /* 字号层级：display > title > section > body > small */
+  --font-size-display: 44px;
+  --font-size-title: 32px;
+  --font-size-section: 20px;
+  --font-size-body: 15px;
+  --font-size-small: 13px;
+  --font-size-caption: 12px;
+
+  --line-height-display: 1.1;
+  --line-height-title: 1.2;
+  --line-height-body: 1.6;
+  --line-height-ui: 1.45;
+
+  --motion-fast: 140ms;
+  --motion-standard: 220ms;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  --font-ui: "Noto Sans SC Variable", "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+  --font-reading: "Noto Serif SC Variable", "Noto Serif SC", "Songti SC", serif;
+  /* 标题走衬线，正文与控件走无衬线：与参考站的 serif 标题 + grotesque 正文对应 */
+  --font-display: var(--font-reading);
+}

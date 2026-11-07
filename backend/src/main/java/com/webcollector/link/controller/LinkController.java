@@ -7,6 +7,7 @@ import com.webcollector.link.dto.SetLinkTagsRequest;
 import com.webcollector.link.dto.UpdateLinkRequest;
 import com.webcollector.link.service.LinkService;
 import com.webcollector.link.dto.LinkCreationResponse;
+import com.webcollector.tag.dto.TagSummary;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -59,6 +60,17 @@ public class LinkController {
     @GetMapping("/{id}")
     public ApiResponse<LinkSummary> getLink(@PathVariable Long id) {
         return ApiResponse.success(linkService.getLink(id));
+    }
+
+    /**
+     * 读取当前用户某条链接关联的标签摘要。
+     *
+     * <p>[软件工程] 入口仍位于链接资源下，服务层先校验链接所有权，
+     * 返回稳定的 id 升序标签集合，避免前端拉取全账号标签后自行猜测关联。</p>
+     */
+    @GetMapping("/{id}/tags")
+    public ApiResponse<List<TagSummary>> listLinkTags(@PathVariable Long id) {
+        return ApiResponse.success(linkService.listLinkTags(id));
     }
 
     // [软件工程] 改元数据用 PATCH：局部更新，客户端不需要回传完整资源。

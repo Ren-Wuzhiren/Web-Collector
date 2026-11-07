@@ -18,6 +18,8 @@ import com.webcollector.link.dto.UpdateLinkRequest;
 import com.webcollector.link.entity.Link;
 import com.webcollector.link.mapper.LinkMapper;
 import com.webcollector.link.support.UrlNormalizer;
+import com.webcollector.tag.dto.TagSummary;
+import com.webcollector.tag.entity.Tag;
 import com.webcollector.tag.entity.LinkTag;
 import com.webcollector.tag.mapper.LinkTagMapper;
 import com.webcollector.tag.mapper.TagMapper;
@@ -39,6 +41,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 public class LinkServiceTest {
@@ -294,6 +297,60 @@ public class LinkServiceTest {
                         exception -> assertThat(exception.getErrorCode())
                                 .isEqualTo(ErrorCode.NOT_FOUND)
                 );
+    }
+
+    // [测试意图] 验证本人链接的标签按 id 升序返回，并带上标签在账号内的真实使用次数。
+    @Test
+    void shouldListOwnedLinkTagsInIdOrderWithUsageCounts() {
+        when(linkMapper.selectOne(any())).thenReturn(
+                existingLink(10L, 5L, "https://example.com/a")
+        );
+        when(linkTagMapper.selectList(any())).thenReturn(List.of(
+                linkTag(3L),
+                linkTag(7L)
+        ));
+        when(tagMapper.selectList(any())).thenReturn(List.of(
+                existingTag(3L, "Java"),
+                existingTag(7L, "Redis")
+        ));
+        when(linkTagMapper.selectCount(any())).thenReturn(2L, 1L);
+
+        List<TagSummary> tags = linkService.listLinkTags(10L);
+
+        assertThat(tags).extracting(TagSummary::id)
+                .containsExactly(3L, 7L);
+        assertThat(tags).extracting(TagSummary::name)
+                .containsExactly("Java", "Redis");
+        assertThat(tags).extracting(TagSummary::linkCount)
+                .containsExactly(2L, 1L);
+    }
+
+    // [测试意图] 验证本人链接没有标签时返回空数组，不再查询标签表或统计使用次数。
+    @Test
+    void shouldReturnEmptyListWhenOwnedLinkHasNoTags() {
+        when(linkMapper.selectOne(any())).thenReturn(
+                existingLink(10L, 5L, "https://example.com/a")
+        );
+        when(linkTagMapper.selectList(any())).thenReturn(List.of());
+
+        assertThat(linkService.listLinkTags(10L)).isEmpty();
+
+        verifyNoInteractions(tagMapper);
+    }
+
+    // [测试意图] 验证读取他人或不存在的链接标签返回 404，且不查询任何标签数据。
+    @Test
+    void shouldRejectListLinkTagsWhenLinkNotOwned() {
+        when(linkMapper.selectOne(any())).thenReturn(null);
+
+        assertThatThrownBy(() -> linkService.listLinkTags(99L))
+                .isInstanceOfSatisfying(
+                        BusinessException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.NOT_FOUND)
+                );
+
+        verifyNoInteractions(linkTagMapper, tagMapper);
     }
 
     // [测试意图] 验证更新写回新的集合、标题和描述，并把 updatedAt 推到当前时间。
@@ -561,5 +618,23 @@ public class LinkServiceTest {
         link.setCreatedAt(OLDER_TIME);
         link.setUpdatedAt(OLDER_TIME);
         return link;
+    }
+
+    private static LinkTag linkTag(Long tagId) {
+        LinkTag linkTag = new LinkTag();
+        linkTag.setLinkId(10L);
+        linkTag.setTagId(tagId);
+        linkTag.setCreatedAt(OLDER_TIME);
+        return linkTag;
+    }
+
+    private static Tag existingTag(Long id, String name) {
+        Tag tag = new Tag();
+        tag.setId(id);
+        tag.setUserId(1L);
+        tag.setName(name);
+        tag.setCreatedAt(OLDER_TIME);
+        tag.setUpdatedAt(OLDER_TIME);
+        return tag;
     }
 }

@@ -12,6 +12,7 @@ import com.webcollector.link.dto.LinkSummary;
 import com.webcollector.link.dto.SetLinkTagsRequest;
 import com.webcollector.link.dto.UpdateLinkRequest;
 import com.webcollector.link.service.LinkService;
+import com.webcollector.tag.dto.TagSummary;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -231,6 +232,54 @@ public class LinkControllerTest {
                         .value("2026-10-15T12:00:00Z"))
                 .andExpect(jsonPath("$.requestId")
                         .value("req-link-003"));
+    }
+
+    // [测试意图] 验证读取链接标签返回 200、统一响应和完整 TagSummary 字段。
+    @Test
+    void shouldReturnLinkTagsWhenListing() throws Exception {
+        when(linkService.listLinkTags(9L)).thenReturn(List.of(
+                new TagSummary(3L, "Java", 2L, FIXED_INSTANT),
+                new TagSummary(7L, "Redis", 1L, FIXED_INSTANT)
+        ));
+
+        mockMvc.perform(get("/api/v1/links/9/tags")
+                        .header(
+                                RequestIdFilter.REQUEST_ID_HEADER,
+                                "req-link-tags-001"
+                        ))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].id").value(3))
+                .andExpect(jsonPath("$.data[0].name").value("Java"))
+                .andExpect(jsonPath("$.data[0].linkCount").value(2))
+                .andExpect(jsonPath("$.data[0].createdAt")
+                        .value("2026-10-15T12:00:00Z"))
+                .andExpect(jsonPath("$.data[1].id").value(7))
+                .andExpect(jsonPath("$.requestId")
+                        .value("req-link-tags-001"));
+
+        verify(linkService).listLinkTags(9L);
+    }
+
+    // [测试意图] 验证本人链接没有标签时仍返回 200 和空数组，而不是 404。
+    @Test
+    void shouldReturnEmptyLinkTagsWhenNoneAreAssociated() throws Exception {
+        when(linkService.listLinkTags(9L)).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/v1/links/9/tags"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data").isEmpty());
+    }
+
+    // [测试意图] 验证读取不存在或他人的链接标签返回 404 NOT_FOUND。
+    @Test
+    void shouldReturnNotFoundWhenListingTagsForUnknownLink() throws Exception {
+        when(linkService.listLinkTags(99L))
+                .thenThrow(new BusinessException(ErrorCode.NOT_FOUND));
+
+        mockMvc.perform(get("/api/v1/links/99/tags"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
     }
 
     // [测试意图] 验证更新链接返回 200、更新成功消息和新的集合归属。

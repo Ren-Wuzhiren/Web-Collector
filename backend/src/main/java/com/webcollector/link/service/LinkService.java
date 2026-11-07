@@ -17,6 +17,7 @@ import com.webcollector.link.dto.UpdateLinkRequest;
 import com.webcollector.link.entity.Link;
 import com.webcollector.link.mapper.LinkMapper;
 import com.webcollector.link.support.UrlNormalizer;
+import com.webcollector.tag.dto.TagSummary;
 import com.webcollector.tag.entity.LinkTag;
 import com.webcollector.tag.entity.Tag;
 import com.webcollector.tag.mapper.LinkTagMapper;
@@ -137,6 +138,43 @@ public class LinkService {
         Long userId = currentUserId();
 
         return toSummary(requireOwnedLink(linkId, userId));
+    }
+
+    /**
+     * 读取当前用户某条链接关联的标签摘要。
+     *
+     * <p>[业务] 先校验链接所有权，再读取关联；链接不存在或不属于当前用户统一
+     * 返回 404，不通过标签数据泄露链接是否存在。标签按 tag_id 升序返回，
+     * linkCount 继续表示标签在整个账号中被使用的链接数。</p>
+     */
+    @Transactional(readOnly = true)
+    public List<TagSummary> listLinkTags(Long linkId) {
+        Long userId = currentUserId();
+        requireOwnedLink(linkId, userId);
+
+        List<Long> tagIds = linkTagMapper.selectList(
+                        new LambdaQueryWrapper<LinkTag>()
+                                .eq(LinkTag::getLinkId, linkId)
+                                .orderByAsc(LinkTag::getTagId)
+                )
+                .stream()
+                .map(LinkTag::getTagId)
+                .distinct()
+                .toList();
+
+        if (tagIds.isEmpty()) {
+            return List.of();
+        }
+
+        return tagMapper.selectList(
+                        new LambdaQueryWrapper<Tag>()
+                                .eq(Tag::getUserId, userId)
+                                .in(Tag::getId, tagIds)
+                                .orderByAsc(Tag::getId)
+                )
+                .stream()
+                .map(tag -> toTagSummary(tag, countLinksForTag(tag.getId())))
+                .toList();
     }
 
     @Transactional
@@ -276,6 +314,15 @@ public class LinkService {
         return List.copyOf(new LinkedHashSet<>(tagIds));
     }
 
+    private long countLinksForTag(Long tagId) {
+        Long count = linkTagMapper.selectCount(
+                new LambdaQueryWrapper<LinkTag>()
+                        .eq(LinkTag::getTagId, tagId)
+        );
+
+        return count == null ? 0L : count;
+    }
+
     // [软件工程] 标签数量是个位数，逐条 insert 比拼一条多值 INSERT 更好读，
     // 也更容易在出错时定位是哪一条。等出现批量导入场景再考虑批量写入。
     private void attachTags(
@@ -324,6 +371,15 @@ public class LinkService {
                 // [Java] 数据库存的是不带时区的 LocalDateTime，这里按 UTC 语义转成 Instant 再对外输出。
                 link.getCreatedAt().toInstant(ZoneOffset.UTC),
                 link.getUpdatedAt().toInstant(ZoneOffset.UTC)
+        );
+    }
+
+    private TagSummary toTagSummary(Tag tag, long linkCount) {
+        return new TagSummary(
+                tag.getId(),
+                tag.getName(),
+                linkCount,
+                tag.getCreatedAt().toInstant(ZoneOffset.UTC)
         );
     }
 }

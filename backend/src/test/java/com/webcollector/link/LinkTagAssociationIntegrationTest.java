@@ -33,9 +33,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * POST /links、PUT /links/{id}/tags 与 DELETE /tags/{id} 之后链接依然可读"，
  * 只有端到端跑一遍。
  *
- * [软件工程] 观察角度是刻意反过来选的：LinkSummary 不返回标签，所以本轮
- * 只能从标签那一侧（GET /tags 的 linkCount）反向确认关联真的落库了。
- * 某条链接挂了哪些标签要等 M6.3 / M7.3 才有读接口。
+ * [软件工程] 标签关联既从标签侧的 linkCount 验证，也从链接侧的
+ * GET /links/{id}/tags 正向读取，证明页面依赖接口与写入语义一致。
  */
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.MOCK,
@@ -166,6 +165,98 @@ public class LinkTagAssociationIntegrationTest {
         assertThat(linkCountOf(bobToken, "Kotlin")).isZero();
     }
 
+    // [测试意图] 验证链接标签按 id 升序读取、使用次数真实，且 GET 不改变关联数据。
+    @Test
+    void shouldReadOwnedLinkTagsWithUsageCountsWithoutChangingAssociations()
+            throws Exception {
+        String token = registerAndLogin("tag-query-owner");
+        long javaId = createTag(token, "Java");
+        long redisId = createTag(token, "Redis");
+        long inboxId = defaultInboxId(token);
+
+        long linkId = saveLinkWithTags(
+                token,
+                inboxId,
+                "https://example.com/a",
+                redisId,
+                javaId
+        );
+        saveLinkWithTags(
+                token,
+                inboxId,
+                "https://example.com/b",
+                javaId
+        );
+
+        Long associationsBefore = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM link_tag",
+                Long.class
+        );
+
+        mockMvc.perform(get("/api/v1/links/" + linkId + "/tags")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[0].id").value(javaId))
+                .andExpect(jsonPath("$.data[0].name").value("Java"))
+                .andExpect(jsonPath("$.data[0].linkCount").value(2))
+                .andExpect(jsonPath("$.data[1].id").value(redisId))
+                .andExpect(jsonPath("$.data[1].name").value("Redis"))
+                .andExpect(jsonPath("$.data[1].linkCount").value(1));
+
+        Long associationsAfter = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM link_tag",
+                Long.class
+        );
+        assertThat(associationsAfter).isEqualTo(associationsBefore);
+    }
+
+    // [测试意图] 验证本人链接没有关联标签时返回 200 和空数组。
+    @Test
+    void shouldReturnEmptyTagsForOwnedLinkWithoutAssociations()
+            throws Exception {
+        String token = registerAndLogin("tag-query-empty");
+        long linkId = saveLinkWithTags(
+                token,
+                defaultInboxId(token),
+                "https://example.com/empty"
+        );
+
+        mockMvc.perform(get("/api/v1/links/" + linkId + "/tags")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data").isEmpty());
+    }
+
+    // [测试意图] 验证一个用户无法通过链接 id 读取另一个用户的标签关联。
+    @Test
+    void shouldHideAnotherUsersLinkTagsBehindNotFound() throws Exception {
+        String aliceToken = registerAndLogin("tag-query-alice");
+        String bobToken = registerAndLogin("tag-query-bob");
+        long aliceTagId = createTag(aliceToken, "Private");
+        long aliceLinkId = saveLinkWithTags(
+                aliceToken,
+                defaultInboxId(aliceToken),
+                "https://alice.example.com/private",
+                aliceTagId
+        );
+
+        mockMvc.perform(get("/api/v1/links/" + aliceLinkId + "/tags")
+                        .header("Authorization", "Bearer " + bobToken))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"))
+                .andExpect(jsonPath("$.data").doesNotExist());
+    }
+
+    // [测试意图] 验证匿名请求在进入标签查询前返回 401 AUTH_REQUIRED。
+    @Test
+    void shouldRequireLoginWhenReadingLinkTags() throws Exception {
+        mockMvc.perform(get("/api/v1/links/1/tags"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH_REQUIRED"));
+    }
+
     private String registerAndLogin(String username) throws Exception {
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -257,8 +348,7 @@ public class LinkTagAssociationIntegrationTest {
         return id.longValue();
     }
 
-    // [软件工程] 从标签这一侧反向观察关联：LinkSummary 不返回标签，
-    // 所以"关联是否真的写进了 link_tag"只能靠这个计数来证明。
+    // [软件工程] 从标签侧观察关联是否真实落库并参与账号范围计数。
     private long linkCountOf(String token, String tagName) throws Exception {
         String body = mockMvc.perform(get("/api/v1/tags")
                         .header("Authorization", "Bearer " + token))
