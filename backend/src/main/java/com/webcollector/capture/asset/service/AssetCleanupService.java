@@ -47,6 +47,15 @@ public class AssetCleanupService {
     }
 
     @Transactional
+    public void enqueueForCaptureJob(long captureJobId) {
+        LocalDateTime now = now();
+        for (String path : assetMapper.selectStoragePathsByCaptureJobId(captureJobId)) {
+            storage.resolve(path);
+            cleanupJobMapper.enqueueIfAbsent(path, now);
+        }
+    }
+
+    @Transactional
     public void enqueue(String storagePath) {
         storage.resolve(storagePath);
         cleanupJobMapper.enqueueIfAbsent(storagePath, now());

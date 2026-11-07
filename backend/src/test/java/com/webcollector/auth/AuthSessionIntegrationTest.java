@@ -71,6 +71,8 @@ public class AuthSessionIntegrationTest {
                         .value("session-user"))
                 .andExpect(jsonPath("$.data.email")
                         .value("session@example.com"))
+                .andExpect(jsonPath("$.data.role")
+                        .value("USER"))
                 .andExpect(jsonPath("$.data.passwordHash")
                         .doesNotExist());
 
@@ -145,6 +147,33 @@ public class AuthSessionIntegrationTest {
                         .value("退出成功"));
     }
 
+    // [测试意图] 验证角色从数据库实时读取，无须重新登录即可响应管理员提升。
+    @Test
+    void shouldRefreshDatabaseRoleForExistingSession() throws Exception {
+        register(
+                "role-refresh-user",
+                "role-refresh@example.com"
+        );
+        MvcResult loginResult = login(
+                "role-refresh-user",
+                "correct-horse"
+        );
+        String token = JsonPath.read(
+                loginResult.getResponse().getContentAsString(),
+                "$.data.token"
+        );
+
+        jdbcTemplate.update(
+                "UPDATE app_user SET role = 'ADMIN' WHERE username = ?",
+                "role-refresh-user"
+        );
+
+        mockMvc.perform(get("/api/v1/auth/me")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.role").value("ADMIN"));
+    }
+
     private void register(
             String username,
             String email
@@ -178,6 +207,7 @@ public class AuthSessionIntegrationTest {
                 .andExpect(jsonPath("$.data.tokenName")
                         .value("Authorization"))
                 .andExpect(jsonPath("$.data.expiresAt").isString())
+                .andExpect(jsonPath("$.data.user.role").value("USER"))
                 .andReturn();
     }
 }

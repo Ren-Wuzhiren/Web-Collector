@@ -18,6 +18,8 @@ public class AppUser {
 
     private String passwordHash;
 
+    private UserRole role;
+
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;
@@ -52,6 +54,14 @@ public class AppUser {
 
     public void setPasswordHash(String passwordHash) {
         this.passwordHash = passwordHash;
+    }
+
+    public UserRole getRole() {
+        return role;
+    }
+
+    public void setRole(UserRole role) {
+        this.role = role;
     }
 
     public LocalDateTime getUpdatedAt() {

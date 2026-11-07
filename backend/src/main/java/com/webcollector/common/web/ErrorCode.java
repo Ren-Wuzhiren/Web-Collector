@@ -36,6 +36,7 @@ public enum ErrorCode {
     COLLECTION_NOT_EMPTY(HttpStatus.CONFLICT, "集合中还有链接"),
     LINK_ALREADY_EXISTS(HttpStatus.CONFLICT, "该链接已经保存"),
     CAPTURE_JOB_INVALID_STATE(HttpStatus.CONFLICT, "任务状态不允许该操作"),
+    CAPTURE_JOB_NOT_RETRYABLE(HttpStatus.CONFLICT, "该任务当前不能重试"),
     SERVICE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "服务暂时不可用");
 
     private final HttpStatus status;

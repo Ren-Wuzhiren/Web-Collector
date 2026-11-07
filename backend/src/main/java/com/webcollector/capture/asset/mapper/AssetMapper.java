@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.webcollector.capture.asset.entity.Asset;
 import com.webcollector.capture.asset.entity.AssetFormat;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
@@ -43,6 +44,19 @@ public interface AssetMapper extends BaseMapper<Asset> {
 
     @Select("SELECT storage_path FROM asset WHERE link_id = #{linkId} ORDER BY id")
     List<String> selectStoragePathsByLink(@Param("linkId") long linkId);
+
+    @Select("""
+            SELECT storage_path
+            FROM asset
+            WHERE capture_job_id = #{captureJobId}
+            ORDER BY id
+            """)
+    List<String> selectStoragePathsByCaptureJobId(
+            @Param("captureJobId") long captureJobId
+    );
+
+    @Delete("DELETE FROM asset WHERE capture_job_id = #{captureJobId}")
+    int deleteByCaptureJobId(@Param("captureJobId") long captureJobId);
 
     @Select("SELECT COUNT(*) FROM asset WHERE storage_path = #{storagePath}")
     int countByStoragePath(@Param("storagePath") String storagePath);

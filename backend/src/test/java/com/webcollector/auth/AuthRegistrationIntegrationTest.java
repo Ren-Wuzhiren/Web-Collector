@@ -2,6 +2,7 @@ package com.webcollector.auth;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.webcollector.auth.entity.AppUser;
+import com.webcollector.auth.entity.UserRole;
 import com.webcollector.auth.mapper.AppUserMapper;
 import com.webcollector.support.SharedTestContainers;
 import org.junit.jupiter.api.BeforeEach;
@@ -69,6 +70,8 @@ public class AuthRegistrationIntegrationTest {
                         .value("integration-student"))
                 .andExpect(jsonPath("$.data.email")
                         .value("integration@example.com"))
+                .andExpect(jsonPath("$.data.role")
+                        .value("USER"))
                 .andExpect(jsonPath("$.data.passwordHash")
                         .doesNotExist());
 
@@ -85,6 +88,7 @@ public class AuthRegistrationIntegrationTest {
                 .isEqualTo("integration@example.com");
         assertThat(saved.getPasswordHash())
                 .isNotEqualTo("correct-horse");
+        assertThat(saved.getRole()).isEqualTo(UserRole.USER);
         assertThat(passwordEncoder.matches(
                 "correct-horse",
                 saved.getPasswordHash()

@@ -7,6 +7,7 @@ import com.webcollector.auth.dto.LoginResponse;
 import com.webcollector.auth.dto.RegisterRequest;
 import com.webcollector.auth.dto.UserSummary;
 import com.webcollector.auth.entity.AppUser;
+import com.webcollector.auth.entity.UserRole;
 import com.webcollector.auth.mapper.AppUserMapper;
 import com.webcollector.auth.session.SessionToken;
 import com.webcollector.auth.session.SessionTokenService;
@@ -55,6 +56,7 @@ public class AuthService {
                 user.getId(),
                 user.getUsername(),
                 user.getEmail(),
+                user.getRole(),
                 user.getCreatedAt().toInstant(ZoneOffset.UTC)
         );
     }
@@ -89,6 +91,7 @@ public class AuthService {
         user.setPasswordHash(
                 passwordEncoder.encode(request.password())
         );
+        user.setRole(UserRole.USER);
         user.setCreatedAt(now);
         user.setUpdatedAt(now);
 
@@ -108,6 +111,7 @@ public class AuthService {
                 user.getId(),
                 user.getUsername(),
                 user.getEmail(),
+                user.getRole(),
                 now.toInstant(ZoneOffset.UTC)
         );
 

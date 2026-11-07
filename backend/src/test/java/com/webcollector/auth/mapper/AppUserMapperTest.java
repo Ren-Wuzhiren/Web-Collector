@@ -2,6 +2,7 @@ package com.webcollector.auth.mapper;
 
 
 import com.webcollector.auth.entity.AppUser;
+import com.webcollector.auth.entity.UserRole;
 import com.webcollector.support.SharedTestContainers;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,6 +48,7 @@ class AppUserMapperTest {
         assertThat(loaded.getUsername()).isEqualTo("mapper-student");
         assertThat(loaded.getEmail()).isEqualTo("mapper-student@example.com");
         assertThat(loaded.getPasswordHash()).isEqualTo("$2a$10$placeholder");
+        assertThat(loaded.getRole()).isEqualTo(UserRole.USER);
         assertThat(loaded.getCreatedAt()).isEqualTo(now);
         assertThat(loaded.getUpdatedAt()).isEqualTo(now);
     }

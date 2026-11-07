@@ -4,6 +4,7 @@ import com.webcollector.auth.config.AuthProperties;
 import com.webcollector.auth.dto.RegisterRequest;
 import com.webcollector.auth.dto.UserSummary;
 import com.webcollector.auth.entity.AppUser;
+import com.webcollector.auth.entity.UserRole;
 import com.webcollector.auth.mapper.AppUserMapper;
 import com.webcollector.auth.session.SessionTokenService;
 import com.webcollector.collection.service.CollectionService;
@@ -146,6 +147,7 @@ public class AuthServiceTest {
         assertThat(summary.username()).isEqualTo("student");
         assertThat(summary.email())
                 .isEqualTo("student@example.com");
+        assertThat(summary.role()).isEqualTo(UserRole.USER);
         assertThat(summary.createdAt())
                 .isEqualTo(FIXED_INSTANT);
 
@@ -161,6 +163,7 @@ public class AuthServiceTest {
 
         assertThat(savedUser.getPasswordHash())
                 .isNotEqualTo("correct-horse");
+        assertThat(savedUser.getRole()).isEqualTo(UserRole.USER);
 
         assertThat(savedUser.getCreatedAt())
                 .isEqualTo(FIXED_TIME);
@@ -316,6 +319,7 @@ public class AuthServiceTest {
                 .isEqualTo("student");
         assertThat(response.user().email())
                 .isEqualTo("student@example.com");
+        assertThat(response.user().role()).isEqualTo(UserRole.USER);
         assertThat(response.user().createdAt())
                 .isEqualTo(FIXED_INSTANT);
 
@@ -336,6 +340,7 @@ public class AuthServiceTest {
         user.setUsername("student");
         user.setEmail("student@example.com");
         user.setPasswordHash("$2a$10$hashed");
+        user.setRole(UserRole.USER);
         user.setCreatedAt(FIXED_TIME);
         user.setUpdatedAt(FIXED_TIME);
         return user;
@@ -358,6 +363,7 @@ public class AuthServiceTest {
         assertThat(summary.username()).isEqualTo("student");
         assertThat(summary.email())
                 .isEqualTo("student@example.com");
+        assertThat(summary.role()).isEqualTo(UserRole.USER);
         assertThat(summary.createdAt())
                 .isEqualTo(FIXED_INSTANT);
 

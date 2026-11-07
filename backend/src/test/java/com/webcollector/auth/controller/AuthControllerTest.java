@@ -2,6 +2,7 @@ package com.webcollector.auth.controller;
 
 import com.webcollector.auth.dto.RegisterRequest;
 import com.webcollector.auth.dto.UserSummary;
+import com.webcollector.auth.entity.UserRole;
 import com.webcollector.auth.service.AuthService;
 import com.webcollector.common.web.BusinessException;
 import com.webcollector.common.web.ErrorCode;
@@ -55,6 +56,7 @@ public class AuthControllerTest {
                         1L,
                         "student",
                         "student@example.com",
+                        UserRole.USER,
                         Instant.parse("2026-10-07T12:00:00Z")
                 ));
 
@@ -80,6 +82,7 @@ public class AuthControllerTest {
                 .andExpect(jsonPath("$.data.username").value("student"))
                 .andExpect(jsonPath("$.data.email")
                         .value("student@example.com"))
+                .andExpect(jsonPath("$.data.role").value("USER"))
                 .andExpect(jsonPath("$.data.createdAt")
                         .value("2026-10-07T12:00:00Z"))
                 .andExpect(jsonPath("$.message").value("注册成功"))
@@ -252,6 +255,7 @@ public class AuthControllerTest {
                                 1L,
                                 "student",
                                 "student@example.com",
+                                UserRole.USER,
                                 Instant.parse("2026-10-08T12:00:00Z")
                         )
                 ));
@@ -279,6 +283,8 @@ public class AuthControllerTest {
                         .value(1))
                 .andExpect(jsonPath("$.data.user.username")
                         .value("student"))
+                .andExpect(jsonPath("$.data.user.role")
+                        .value("USER"))
                 .andExpect(jsonPath("$.message")
                         .value("登录成功"))
                 .andExpect(jsonPath("$.requestId")
@@ -363,6 +369,7 @@ public class AuthControllerTest {
                         1L,
                         "student",
                         "student@example.com",
+                        UserRole.USER,
                         Instant.parse("2026-10-08T12:00:00Z")
                 ));
 
@@ -382,6 +389,8 @@ public class AuthControllerTest {
                         .value("student"))
                 .andExpect(jsonPath("$.data.email")
                         .value("student@example.com"))
+                .andExpect(jsonPath("$.data.role")
+                        .value("USER"))
                 .andExpect(jsonPath("$.data.createdAt")
                         .value("2026-10-08T12:00:00Z"))
                 .andExpect(jsonPath("$.data.passwordHash")
