@@ -126,10 +126,11 @@ class SearchIntegrationTest {
         mockMvc.perform(get("/api/v1/search?q=shared")
                         .header("Authorization", "Bearer " + aliceToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].title").value("Alice Search"));
+                .andExpect(jsonPath("$.data.items[0].title")
+                        .value("Alice Search"));
     }
 
-    // [测试意图] 验证空白、超长搜索词和未登录请求返回稳定错误响应。
+    // [测试意图] 验证空白 q 表示不加全文条件，超长 q 和未登录请求返回稳定错误。
     @Test
     void shouldValidateSearchQueryAndAuthentication() throws Exception {
         String token = registerAndLogin("search-validation");
@@ -138,8 +139,9 @@ class SearchIntegrationTest {
         mockMvc.perform(get("/api/v1/search")
                         .param("q", "   ")
                         .header("Authorization", "Bearer " + token))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items").isArray())
+                .andExpect(jsonPath("$.data.hasMore").value(false));
 
         mockMvc.perform(get("/api/v1/search")
                         .param("q", tooLong)
@@ -160,7 +162,7 @@ class SearchIntegrationTest {
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
-        List<Number> ids = JsonPath.read(body, "$.data[*].id");
+        List<Number> ids = JsonPath.read(body, "$.data.items[*].id");
         return ids.stream().map(Number::longValue).toList();
     }
 
