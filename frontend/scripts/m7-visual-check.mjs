@@ -470,6 +470,8 @@ async function runInspections() {
         INSPECT_SCRIPT,
         visualTarget(page.route, page.authenticated !== false),
         '--app',
+        '--allow',
+        'palette-claude,palette-cream',
         '--out',
         outputDir,
       ],
