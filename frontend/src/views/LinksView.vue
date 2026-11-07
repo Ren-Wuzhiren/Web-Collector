@@ -762,6 +762,7 @@ function openLink(link, navigate, event) {
 }
 
 .archive-card h3 {
+  display: -webkit-box;
   margin: 9px 0 0;
   overflow: hidden;
   color: var(--text);
@@ -770,7 +771,9 @@ function openLink(link, navigate, event) {
   letter-spacing: -0.015em;
   line-height: 1.42;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .archive-description {

@@ -305,6 +305,7 @@ test('截断标题不播放标题形变过渡', async ({ page }) => {
     'A very long article title that must be visibly clipped inside the compact mobile archive row',
   )
   await page.goto('/links')
+  await page.getByRole('button', { name: '列表视图' }).click()
 
   const title = page.locator('.link-copy h3')
   await expect.poll(() => title.evaluate(

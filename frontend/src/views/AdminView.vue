@@ -237,9 +237,9 @@ onMounted(loadAll)
 
 <style scoped>
 .admin-page {
-  width: min(100%, var(--content-width));
+  width: min(var(--content-width), calc(100% - (2 * var(--page-pad))));
   margin: 0 auto;
-  padding: 28px var(--page-pad) 64px;
+  padding: 48px 0 96px;
 }
 
 .page-head,
@@ -251,7 +251,7 @@ onMounted(loadAll)
 }
 
 .page-head {
-  padding: 10px 0 24px;
+  padding: 0 0 32px;
 }
 
 h1,
@@ -262,9 +262,10 @@ p {
 
 h1 {
   margin-bottom: 8px;
-  font-size: var(--font-size-title);
-  font-weight: 650;
-  letter-spacing: -0.025em;
+  font-size: 32px;
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
 }
 
 .page-copy,
@@ -284,7 +285,7 @@ h1 {
   justify-content: center;
   gap: 8px;
   border: 1px solid var(--control);
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-pill);
   padding: 0 14px;
   color: var(--text);
   background: var(--surface);
@@ -353,7 +354,7 @@ h1 {
 }
 
 .failed-panel {
-  margin-top: 20px;
+  margin-top: 24px;
   border: 1px solid var(--border);
   border-radius: var(--radius-panel);
   background: var(--surface);
@@ -449,7 +450,7 @@ code {
 .retry-button {
   min-width: 72px;
   border-color: var(--text);
-  color: var(--surface);
+  color: var(--on-primary);
   background: var(--text);
 }
 
@@ -515,7 +516,7 @@ code {
 
 @media (max-width: 760px) {
   .admin-page {
-    padding-top: 20px;
+    padding-top: 30px;
   }
 
   .page-head {

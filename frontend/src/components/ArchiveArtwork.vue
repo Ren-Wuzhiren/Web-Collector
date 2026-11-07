@@ -19,27 +19,21 @@ const props = defineProps({
 const variants = [
   {
     tone: 'var(--art-peach)',
-    label: 'archived sheets',
   },
   {
     tone: 'var(--art-coral)',
-    label: 'captured window',
   },
   {
     tone: 'var(--art-blue)',
-    label: 'linked pages',
   },
   {
     tone: 'var(--art-lavender)',
-    label: 'open references',
   },
   {
     tone: 'var(--art-mist)',
-    label: 'browser evidence',
   },
   {
     tone: 'var(--art-sage)',
-    label: 'archive stack',
   },
 ]
 
@@ -63,7 +57,7 @@ const variant = computed(() => variants[variantIndex.value])
     class="archive-art"
     :style="{ '--art-surface': variant.tone }"
     :data-art-variant="variantIndex"
-    :aria-label="`${variant.label} illustration`"
+    aria-hidden="true"
   >
     <svg viewBox="0 0 320 184" fill="none" aria-hidden="true">
       <g

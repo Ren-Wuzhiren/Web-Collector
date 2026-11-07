@@ -87,7 +87,7 @@
   --rule: #282623;
   --control: #4a463f;
   --control-hover: #6a645b;
-  --text: #faf9f5;
+  --text: #faf9f5; /* taste-skill-ignore 参考图取样的主文字色 */
   --text-hover: #ffffff;
   --muted: #b0aea6;
   --faint: #878680;

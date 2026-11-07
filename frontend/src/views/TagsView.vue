@@ -194,7 +194,8 @@ function usageWidth(tag) {
       </button>
     </header>
 
-    <section class="create-panel" aria-labelledby="create-tag-title">
+    <div class="tags-workspace">
+    <aside class="create-panel" aria-labelledby="create-tag-title">
       <div class="create-copy">
         <h2 id="create-tag-title">新建标签</h2>
         <p>用简短、稳定的名称整理收藏；同名标签不会被重复创建。</p>
@@ -223,7 +224,21 @@ function usageWidth(tag) {
           </div>
         </div>
       </form>
-    </section>
+      <dl class="tag-stats">
+        <div>
+          <dt>全部</dt>
+          <dd class="num">{{ tags.length }}</dd>
+        </div>
+        <div>
+          <dt>使用中</dt>
+          <dd class="num">{{ usedCount }}</dd>
+        </div>
+        <div>
+          <dt>未使用</dt>
+          <dd class="num">{{ unusedCount }}</dd>
+        </div>
+      </dl>
+    </aside>
 
     <section class="tag-ledger" aria-labelledby="tag-ledger-title">
       <header class="ledger-header">
@@ -395,14 +410,15 @@ function usageWidth(tag) {
         <span><ArchiveCounter :value="unusedCount" /> 个标签尚未关联收藏</span>
       </footer>
     </section>
+    </div>
   </main>
 </template>
 
 <style scoped>
 .tags-page {
-  width: min(100%, 1180px);
+  width: min(var(--content-width), calc(100% - (2 * var(--page-pad))));
   margin: 0 auto;
-  padding: 34px 24px 64px;
+  padding: 56px 0 96px;
 }
 
 .page-heading {
@@ -410,7 +426,7 @@ function usageWidth(tag) {
   align-items: flex-end;
   justify-content: space-between;
   gap: 24px;
-  margin-bottom: 24px;
+  margin-bottom: 40px;
 }
 
 .heading-copy {
@@ -425,17 +441,25 @@ p {
 }
 
 h1 {
-  font-size: 24px;
-  line-height: 32px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  font-size: var(--font-size-title);
+  line-height: var(--line-height-title);
+  font-weight: 500;
+  letter-spacing: -0.03em;
 }
 
 .page-heading p {
-  margin-top: 6px;
+  max-width: 52em;
+  margin-top: 14px;
   color: var(--muted);
-  font-size: 14px;
-  line-height: 1.55;
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+}
+
+.tags-workspace {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  align-items: start;
+  gap: 32px;
 }
 
 .create-panel,
@@ -446,18 +470,16 @@ h1 {
 }
 
 .create-panel {
-  display: grid;
-  grid-template-columns: minmax(260px, 0.8fr) minmax(420px, 1.2fr);
-  align-items: end;
-  gap: 48px;
-  padding: 20px 24px;
+  position: sticky;
+  top: calc(var(--topbar-height) + 24px);
+  padding: 24px;
 }
 
 .create-copy h2,
 .ledger-header h2 {
-  font-size: 16px;
-  line-height: 24px;
-  font-weight: 600;
+  font-size: 18px;
+  line-height: 1.3;
+  font-weight: 500;
 }
 
 .create-copy p,
@@ -471,6 +493,7 @@ h1 {
 .field-group {
   display: grid;
   gap: 8px;
+  margin-top: 24px;
 }
 
 .field-group > label {
@@ -502,7 +525,7 @@ h1 {
 .primary-button,
 .secondary-button {
   min-height: 36px;
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-pill);
   padding: 0 16px;
   font-size: 14px;
   font-weight: 500;
@@ -514,7 +537,7 @@ h1 {
 
 .primary-button {
   border: 1px solid var(--text);
-  color: var(--surface);
+  color: var(--on-primary);
   background: var(--text);
 }
 
@@ -543,8 +566,39 @@ h1 {
 }
 
 .tag-ledger {
-  margin-top: 16px;
+  min-width: 0;
+  margin-top: 0;
   overflow: hidden;
+}
+
+.tag-stats {
+  margin: 24px 0 0;
+  padding-top: 18px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-top: 1px solid var(--rule);
+}
+
+.tag-stats div {
+  min-width: 0;
+}
+
+.tag-stats div + div {
+  padding-left: 14px;
+  border-left: 1px solid var(--rule);
+}
+
+.tag-stats dt {
+  color: var(--muted);
+  font-size: var(--font-size-caption);
+}
+
+.tag-stats dd {
+  margin: 5px 0 0;
+  color: var(--text);
+  font-size: 22px;
+  font-weight: 500;
+  line-height: 1;
 }
 
 .ledger-header {
@@ -560,6 +614,8 @@ h1 {
   display: flex;
   align-items: center;
   gap: 16px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .filter-group {
@@ -567,14 +623,14 @@ h1 {
   align-items: center;
   gap: 2px;
   padding: 3px;
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-pill);
   background: var(--raised);
 }
 
 .filter-button {
   min-height: 28px;
   border: 1px solid transparent;
-  border-radius: 4px;
+  border-radius: var(--radius-pill);
   padding: 0 11px;
   color: var(--muted);
   background: transparent;
@@ -753,7 +809,7 @@ td {
 .text-button {
   min-height: 32px;
   border: 0;
-  border-radius: 4px;
+  border-radius: var(--radius-pill);
   padding: 0 7px;
   color: var(--muted);
   background: transparent;
@@ -821,7 +877,7 @@ td {
 .state-panel h3 {
   font-size: 15px;
   line-height: 24px;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .state-panel p {
@@ -904,9 +960,21 @@ td {
 }
 
 @media (max-width: 900px) {
+  .tags-page {
+    padding-top: 38px;
+  }
+
+  .tags-workspace {
+    display: block;
+  }
+
   .create-panel {
-    grid-template-columns: 1fr;
+    position: static;
     gap: 16px;
+  }
+
+  .tag-ledger {
+    margin-top: 24px;
   }
 
   .ledger-header {
@@ -927,15 +995,16 @@ td {
 
 @media (max-width: 640px) {
   .tags-page {
-    padding: 24px 16px 48px;
+    padding: 30px 0 56px;
   }
 
   .page-heading {
     align-items: flex-start;
+    flex-direction: column;
   }
 
   .page-heading p {
-    max-width: 260px;
+    max-width: 34em;
   }
 
   .joined-control,

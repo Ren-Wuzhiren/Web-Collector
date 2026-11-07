@@ -4,12 +4,12 @@
 
 ## 当前状态
 
-- 当前阶段：M7 工程、动效、E2E 与视觉门禁完成，两道学习题待回答；M8.3.1 管理员运营后台完成；下一步进入 M8 部署运维。
+- 当前阶段：M7 工程、动效、E2E 与视觉门禁完成；黑夜主题与编辑式工作台完成；M8.3.1 管理员运营后台完成；下一步进入 M8 部署运维。
 - 后端已实现鉴权、集合、标签、链接、持久化任务、真实 Capture Worker、HTML/PDF/截图资产、正文抽取与搜索。
 - 后端 `mvn -pl backend test` 全量测试 364 项通过，0 失败、0 错误、4 跳过；真实 MySQL 8.4 执行 V1-V17，Redis 7.4 集成正常。
 - 自动调度默认启用：Worker 领取任务后生成三格式快照、登记成功资产、写入正文并完成/失败收尾。
 - `GET /api/v1/search?q=...` 使用 ngram FULLTEXT，强制按当前用户隔离。
-- Vue 前端已有登录、收藏、保存、任务轮询、资产、搜索、标签和管理员运营页面；生产构建、Playwright 27 项和五页三档视觉门禁通过。
+- Vue 前端已有登录、收藏、保存、任务轮询、资产、搜索、标签和管理员运营页面；默认黑夜主题可切换暖白，收藏提供档案卡网格/列表视图；生产构建、Playwright 31 项和五页三档视觉门禁通过。
 - 全栈 Compose、Nginx、CI、备份恢复和真实 URL 验收脚本已加入；Docker 镜像构建受当前 Docker Hub 网络超时阻断，尚未完成容器启动验证。
 - 上游 web/worker 已在本地跑通，首页检查返回 HTTP 200；上游源码仍只用于研究和对照。
 - 参考源码固定在 Linkwarden `v2.16.3`，只用于研究和对照，不直接进入本项目提交。
@@ -76,6 +76,7 @@ Linkwarden 使用 AGPL-3.0。参考源码仅用于理解问题、架构和设计
 
 - [项目卡](PROJECT.md)
 - [当前协作规范](AGENTS.md)
+- [黑夜主题设计规范](design_dark_theme.md)
 - [Agent Kit](new_stantard/agent-kit/README.md)
 - [Prompt System](new_stantard/prompt-system/README.md)
 - [新协作模式说明与回滚记录](docs/需求文档/2026-10-19-008-协作模式升级与旧模式归档.md)

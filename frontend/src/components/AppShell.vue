@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ArchiveMark from './ArchiveMark.vue'
 import AppIcon from './AppIcon.vue'
@@ -10,6 +10,8 @@ const auth = useAuthStore()
 const route = useRoute()
 const router = useRouter()
 const mobileOpen = ref(false)
+const menuButton = ref(null)
+const closeButton = ref(null)
 
 const navItems = computed(() => [
   { to: '/links', label: '收藏', icon: 'links' },
@@ -48,8 +50,43 @@ onBeforeUnmount(() => {
 
 function onKeydown(event) {
   if (event.key === 'Escape' && mobileOpen.value) {
-    mobileOpen.value = false
+    closeNavigation()
   }
+}
+
+function trapModalFocus(event) {
+  if (event.key !== 'Tab') return
+
+  const focusable = Array.from(
+    event.currentTarget.querySelectorAll(
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    ),
+  )
+  if (!focusable.length) return
+
+  const first = focusable[0]
+  const last = focusable[focusable.length - 1]
+
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault()
+    last.focus()
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault()
+    first.focus()
+  }
+}
+
+async function openNavigation() {
+  mobileOpen.value = true
+  await nextTick()
+  closeButton.value?.focus()
+}
+
+async function closeNavigation(restoreFocus = true) {
+  mobileOpen.value = false
+  if (!restoreFocus) return
+  await nextTick()
+  menuButton.value?.focus()
 }
 
 async function logout() {
@@ -106,11 +143,12 @@ async function logout() {
           </div>
 
           <button
+            ref="menuButton"
             class="mobile-menu"
             type="button"
             aria-label="打开导航"
             :aria-expanded="mobileOpen"
-            @click="mobileOpen = true"
+            @click="openNavigation"
           >
             <AppIcon name="menu" :size="20" />
           </button>
@@ -129,7 +167,8 @@ async function logout() {
         role="dialog"
         aria-modal="true"
         aria-label="导航"
-        @click.self="mobileOpen = false"
+        @click.self="closeNavigation()"
+        @keydown="trapModalFocus"
       >
         <div class="mobile-sheet-panel">
           <header class="mobile-sheet-head">
@@ -143,10 +182,11 @@ async function logout() {
               </span>
             </router-link>
             <button
+              ref="closeButton"
               class="icon-button"
               type="button"
               aria-label="关闭导航"
-              @click="mobileOpen = false"
+              @click="closeNavigation()"
             >
               <AppIcon name="close" :size="20" />
             </button>

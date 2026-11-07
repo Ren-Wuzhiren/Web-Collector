@@ -272,12 +272,13 @@ function formatSavedAt(value) {
   <section class="search-page" aria-labelledby="search-title">
     <header class="page-heading">
       <div>
-        <h1 id="search-title">搜索</h1>
+        <h1 id="search-title" class="editorial-title">搜索</h1>
         <p>从已保存的标题、描述和正文里找回网页证据。</p>
       </div>
       <p class="scope-note">检索范围：当前账号的全部收藏</p>
     </header>
 
+    <div class="search-workspace">
     <section class="search-workbench" aria-labelledby="search-form-title">
       <h2 id="search-form-title" class="visually-hidden">搜索条件</h2>
 
@@ -548,15 +549,15 @@ function formatSavedAt(value) {
         </div>
       </template>
     </section>
+    </div>
   </section>
 </template>
 
 <style scoped>
 .search-page {
-  width: 100%;
-  max-width: calc(var(--content-width) + var(--page-pad) * 2);
+  width: min(var(--content-width), calc(100% - (2 * var(--page-pad))));
   margin: 0 auto;
-  padding: 32px var(--page-pad) 64px;
+  padding: 56px 0 96px;
   color: var(--text);
 }
 
@@ -565,7 +566,7 @@ function formatSavedAt(value) {
   align-items: flex-end;
   justify-content: space-between;
   gap: 32px;
-  margin-bottom: 24px;
+  margin-bottom: 40px;
 }
 
 h1,
@@ -576,34 +577,40 @@ p {
 }
 
 .page-heading h1 {
-  font-size: 28px;
-  font-weight: 650;
-  letter-spacing: -0.03em;
-  line-height: 1.15;
+  font-size: var(--font-size-editorial);
+  font-weight: 500;
+  letter-spacing: -0.035em;
+  line-height: var(--line-height-display);
 }
 
 .page-heading p {
-  margin-top: 8px;
+  max-width: 44em;
+  margin-top: 18px;
   color: var(--muted);
-  font-size: 14px;
-  line-height: 1.6;
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
 }
 
 .page-heading .scope-note {
   margin: 0;
   white-space: nowrap;
-  font-size: 13px;
+  font-size: var(--font-size-small);
 }
 
-.search-workbench,
-.results-panel {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-panel);
-  background: var(--surface);
+.search-workspace {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  align-items: start;
+  gap: 32px;
 }
 
 .search-workbench {
+  position: sticky;
+  top: calc(var(--topbar-height) + 24px);
   padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
 }
 
 .field-label {
@@ -617,7 +624,7 @@ p {
 
 .query-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
 }
 
@@ -670,12 +677,14 @@ p {
 }
 
 .search-button {
-  min-width: 124px;
+  width: 100%;
+  min-width: 0;
   min-height: 44px;
   border: 1px solid var(--text);
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-pill);
+  color: var(--on-primary);
   background: var(--text);
-  font-weight: 550;
+  font-weight: 500;
 }
 
 .search-button:not(.is-disabled):hover,
@@ -712,7 +721,7 @@ p {
 
 .filter-grid {
   display: grid;
-  grid-template-columns: minmax(180px, 0.8fr) minmax(220px, 1fr) minmax(310px, 1.35fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
 }
 
@@ -766,8 +775,10 @@ p {
 }
 
 .results-panel {
-  margin-top: 16px;
-  padding: 0 24px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
 .results-heading {
@@ -775,13 +786,13 @@ p {
   align-items: flex-start;
   justify-content: space-between;
   gap: 24px;
-  border-bottom: 1px solid var(--rule);
-  padding: 20px 0 16px;
+  border-bottom: 1px solid var(--border);
+  padding: 0 0 18px;
 }
 
 .results-heading h2 {
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 18px;
+  font-weight: 500;
   line-height: 1.4;
 }
 
@@ -807,7 +818,7 @@ p {
   min-height: 24px;
   max-width: 100%;
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius-pill);
   padding: 3px 8px;
   overflow: hidden;
   color: var(--muted);
@@ -868,12 +879,15 @@ p {
   min-height: 240px;
   align-items: flex-start;
   gap: 16px;
-  padding: 42px 4px;
+  padding: 42px 24px;
+  border: 1px dashed var(--control);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
 }
 
 .result-state h3 {
   font-size: 18px;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1.45;
 }
 
@@ -923,17 +937,29 @@ p {
 }
 
 .results-list {
-  margin: 0;
+  margin: 24px 0 0;
   padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--gap);
   list-style: none;
 }
 
 .result-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 176px;
-  gap: 28px;
-  border-bottom: 1px solid var(--rule);
-  padding: 22px 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  padding: 20px;
+  background: var(--surface);
+  transition: border-color var(--motion-fast) var(--ease-out);
+}
+
+.result-row:hover,
+.result-row:focus-within {
+  border-color: var(--control-hover);
 }
 
 .result-main {
@@ -965,12 +991,15 @@ p {
   overflow: hidden;
   color: var(--text);
   font-size: 17px;
-  font-weight: 600;
+  font-weight: 550;
   letter-spacing: -0.015em;
   line-height: 1.45;
   text-decoration: none;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  display: -webkit-box;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .result-title:hover,
@@ -995,12 +1024,14 @@ p {
 .result-actions {
   display: flex;
   min-width: 0;
-  flex-direction: column;
-  align-items: flex-end;
+  margin-top: auto;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 9px;
 }
 
 .collection-name {
+  margin-right: auto;
   max-width: 100%;
   overflow: hidden;
   color: var(--muted);
@@ -1076,7 +1107,8 @@ p {
   border-color: var(--control);
   color: var(--text);
   background: var(--surface);
-  font-weight: 550;
+  font-weight: 500;
+  border-radius: var(--radius-pill);
 }
 
 .load-more-button:hover,
@@ -1100,7 +1132,19 @@ p {
 
 @media (max-width: 900px) {
   .search-page {
-    padding-top: 24px;
+    padding-top: 38px;
+  }
+
+  .search-workspace {
+    display: block;
+  }
+
+  .search-workbench {
+    position: static;
+  }
+
+  .results-panel {
+    margin-top: 24px;
   }
 
   .filter-grid {
@@ -1155,20 +1199,16 @@ p {
     grid-column: 1 / -1;
   }
 
-  .result-row {
-    grid-template-columns: minmax(0, 1fr) 150px;
-    gap: 20px;
-  }
 }
 
 @media (max-width: 640px) {
   .search-page {
-    padding: 20px var(--page-pad) 40px;
+    padding: 30px 0 56px;
   }
 
   .page-heading {
     display: block;
-    margin-bottom: 18px;
+    margin-bottom: 24px;
   }
 
   .page-heading .scope-note {
@@ -1209,7 +1249,7 @@ p {
   }
 
   .results-panel {
-    padding: 0 18px;
+    padding: 0;
   }
 
   .results-heading {
@@ -1224,17 +1264,20 @@ p {
 
   .result-state {
     min-height: 220px;
-    padding: 32px 0;
+    padding: 28px 20px;
   }
 
   .state-mark {
     display: none;
   }
 
-  .result-row {
+  .results-list {
     grid-template-columns: 1fr;
-    gap: 14px;
-    padding: 20px 0;
+  }
+
+  .result-row {
+    gap: 16px;
+    padding: 20px;
   }
 
   .result-actions {

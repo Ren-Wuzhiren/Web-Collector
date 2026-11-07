@@ -243,10 +243,10 @@ function resetForm() {
 
 .drawer-head h2 {
   margin: 0;
-  font-size: 20px;
+  font-size: 24px;
   line-height: 1.3;
-  font-weight: 650;
-  letter-spacing: -0.02em;
+  font-weight: 500;
+  letter-spacing: -0.03em;
 }
 
 .drawer-head p {
@@ -328,8 +328,8 @@ function resetForm() {
 .secondary-button {
   min-height: 40px;
   padding: 0 16px;
-  border-radius: var(--radius-control);
-  font-weight: 550;
+  border-radius: var(--radius-pill);
+  font-weight: 500;
   transition:
     background-color var(--motion-fast) var(--ease-out),
     border-color var(--motion-fast) var(--ease-out);
@@ -337,7 +337,7 @@ function resetForm() {
 
 .primary-button {
   border: 1px solid var(--text);
-  color: var(--surface);
+  color: var(--on-primary);
   background: var(--text);
 }
 

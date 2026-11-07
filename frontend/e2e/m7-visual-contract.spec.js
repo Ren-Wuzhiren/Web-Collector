@@ -161,11 +161,28 @@ test('收藏页使用顶部主导航和全局主题开关', async ({ page }) => 
   await expect(page.getByRole('button', { name: '切换到浅色主题' })).toBeVisible()
 
   await page.setViewportSize({ width: 390, height: 844 })
-  await page.getByRole('button', { name: '打开导航' }).click()
-  await expect(page.getByRole('dialog', { name: '导航' })).toBeVisible()
+  const openNavigation = page.getByRole('button', { name: '打开导航' })
+  await openNavigation.click()
+  const navigationDialog = page.getByRole('dialog', { name: '导航' })
+  await expect(navigationDialog).toBeVisible()
   await expect(
     page.getByRole('navigation', { name: '移动端主导航' }),
   ).toBeVisible()
+  await expect(page.getByRole('button', { name: '关闭导航' })).toBeFocused()
+
+  const mobileBrand = navigationDialog.getByRole('link', {
+    name: 'WebCollector',
+  })
+  await page.keyboard.press('Shift+Tab')
+  await expect(mobileBrand).toBeFocused()
+  await page.keyboard.press('Shift+Tab')
+  await expect(page.getByRole('button', { name: '退出' })).toBeFocused()
+  await page.keyboard.press('Tab')
+  await expect(mobileBrand).toBeFocused()
+
+  await page.keyboard.press('Escape')
+  await expect(navigationDialog).toHaveCount(0)
+  await expect(openNavigation).toBeFocused()
 })
 
 // [测试意图] 收藏页默认以视觉卡片网格呈现，列表模式可切换并在刷新后保留。

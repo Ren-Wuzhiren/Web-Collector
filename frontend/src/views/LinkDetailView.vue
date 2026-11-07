@@ -816,10 +816,9 @@ function formatBytes(bytes) {
 
 <style scoped>
 .detail-page {
-  width: 100%;
-  max-width: calc(var(--content-width) + (var(--page-pad) * 2));
+  width: min(var(--content-width), calc(100% - (2 * var(--page-pad))));
   margin: 0 auto;
-  padding: 32px var(--page-pad) 64px;
+  padding: 40px 0 96px;
 }
 
 .back-link,
@@ -827,7 +826,7 @@ function formatBytes(bytes) {
 .secondary-action,
 .primary-action {
   min-height: 36px;
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-pill);
   font-size: 14px;
   cursor: pointer;
   transition:
@@ -840,7 +839,7 @@ function formatBytes(bytes) {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  margin: -8px 0 20px;
+  margin: -6px 0 22px;
   padding: 4px 8px;
   border: 0;
   color: var(--muted);
@@ -857,7 +856,7 @@ function formatBytes(bytes) {
   align-items: flex-start;
   justify-content: space-between;
   gap: 32px;
-  margin-bottom: 24px;
+  margin-bottom: 32px;
 }
 
 .title-block {
@@ -874,11 +873,11 @@ function formatBytes(bytes) {
 
 h1 {
   max-width: 820px;
-  margin: 8px 0 0;
-  font-size: 24px;
-  font-weight: 650;
-  line-height: 32px;
-  letter-spacing: -0.02em;
+  margin: 10px 0 0;
+  font-size: var(--font-size-title);
+  font-weight: 500;
+  line-height: var(--line-height-title);
+  letter-spacing: -0.03em;
   text-wrap: balance;
 }
 
@@ -946,7 +945,7 @@ h1 {
 
 .primary-action {
   border: 1px solid var(--text);
-  color: var(--surface);
+  color: var(--on-primary);
   background: var(--text);
 }
 
@@ -956,7 +955,7 @@ h1 {
 
 .detail-layout {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr);
+  grid-template-columns: minmax(0, 1fr) 360px;
   gap: var(--gap);
   align-items: start;
 }
@@ -971,7 +970,7 @@ h1 {
 
 .reading-panel {
   min-height: 560px;
-  padding: 32px;
+  padding: 36px;
 }
 
 .panel-heading {
@@ -983,15 +982,15 @@ h1 {
 
 .panel-heading h2 {
   margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  line-height: 24px;
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 1.3;
 }
 
 .panel-heading p {
-  margin: 3px 0 0;
+  margin: 5px 0 0;
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--font-size-caption);
 }
 
 .reading-heading {
@@ -1011,8 +1010,8 @@ h1 {
   margin: 0;
   color: var(--text);
   font-family: var(--font-reading);
-  font-size: 18px;
-  line-height: 1.75;
+  font-size: 19px;
+  line-height: 1.8;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -1189,7 +1188,7 @@ h1 {
   min-height: 26px;
   align-items: center;
   padding: 3px 9px;
-  border-radius: 4px;
+  border-radius: var(--radius-pill);
   color: var(--text);
   background: var(--active);
   font-size: 12px;
@@ -1479,11 +1478,11 @@ h1 {
 
 .detail-loading-title {
   max-width: 820px;
-  margin: 8px 0 0;
-  font-size: 24px;
-  font-weight: 650;
-  line-height: 32px;
-  letter-spacing: -0.02em;
+  margin: 10px 0 0;
+  font-size: var(--font-size-title);
+  font-weight: 500;
+  line-height: var(--line-height-title);
+  letter-spacing: -0.03em;
   text-wrap: balance;
 }
 
@@ -1557,7 +1556,7 @@ h1 {
 
 @media (max-width: 640px) {
   .detail-page {
-    padding: 20px 16px 48px;
+    padding: 30px 0 56px;
   }
 
   .back-link {

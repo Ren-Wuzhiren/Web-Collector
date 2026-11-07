@@ -237,7 +237,7 @@ async function submit() {
   display: flex;
   min-height: 100svh;
   flex-direction: column;
-  padding: clamp(40px, 5vw, 72px);
+  padding: clamp(32px, 4vw, 64px);
   overflow: hidden;
 }
 
@@ -257,34 +257,35 @@ async function submit() {
 h1 {
   margin: 0;
   color: var(--text);
-  font-size: clamp(34px, 2.7vw, 40px);
-  font-weight: 650;
-  letter-spacing: -0.035em;
-  line-height: 1.05;
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
 }
 
 .intro-copy {
-  width: min(700px, 100%);
+  width: min(760px, 100%);
   margin: auto 0;
-  padding: clamp(64px, 9vh, 104px) 0 clamp(48px, 7vh, 76px);
+  padding: clamp(56px, 8vh, 96px) 0 clamp(42px, 6vh, 68px);
 }
 
 .manifesto {
-  max-width: 13em;
+  max-width: 12em;
   margin: 0;
   color: var(--text);
-  font-size: clamp(30px, 2.45vw, 38px);
+  font-family: var(--font-display);
+  font-size: clamp(42px, 4.4vw, 56px);
   font-weight: 500;
-  letter-spacing: -0.035em;
-  line-height: 1.22;
+  letter-spacing: -0.04em;
+  line-height: 1.05;
 }
 
 .supporting-copy {
-  max-width: 36em;
-  margin: 28px 0 0;
+  max-width: 34em;
+  margin: 24px 0 0;
   color: var(--muted);
   font-size: 16px;
-  line-height: 1.75;
+  line-height: 1.7;
 }
 
 .archive-preview {
@@ -294,7 +295,7 @@ h1 {
 
 .archive-card {
   position: relative;
-  padding: 22px 24px 0;
+  padding: 24px 26px 0;
   border: 1px solid var(--border);
   border-radius: var(--radius-panel);
   background: var(--surface);
@@ -390,7 +391,7 @@ h1 {
 .evidence-item strong {
   color: var(--text);
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .evidence-item span {
@@ -402,12 +403,13 @@ h1 {
   display: grid;
   min-height: 100svh;
   place-items: center;
-  padding: 126px clamp(36px, 5vw, 80px) 0;
+  padding: 64px clamp(32px, 4.5vw, 72px);
+  border-left: 1px solid var(--border);
   background: var(--surface);
 }
 
 .auth-content {
-  width: min(100%, 404px);
+  width: min(100%, 390px);
 }
 
 .auth-heading {
@@ -417,10 +419,11 @@ h1 {
 .auth-heading h2 {
   margin: 0;
   color: var(--text);
-  font-size: 24px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  line-height: 1.25;
+  font-family: var(--font-display);
+  font-size: 34px;
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
 }
 
 .auth-heading p {
@@ -494,7 +497,7 @@ h1 {
 
 .submit-button {
   width: 100%;
-  min-height: 46px;
+  min-height: 44px;
   margin-top: 4px;
   border: 1px solid var(--text);
   border-radius: var(--radius-pill);
@@ -549,7 +552,7 @@ h1 {
   }
 
   .manifesto {
-    font-size: 32px;
+    font-size: 44px;
   }
 }
 
@@ -591,7 +594,7 @@ h1 {
   }
 
   h1 {
-    font-size: 28px;
+    font-size: 20px;
   }
 
   .intro-copy {
@@ -599,7 +602,7 @@ h1 {
   }
 
   .manifesto {
-    font-size: 28px;
+    font-size: 36px;
   }
 
   .supporting-copy {
