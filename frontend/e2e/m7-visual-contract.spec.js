@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-const APPROVED_SECOND_VERSION_TOKENS = {
+const APPROVED_LIGHT_THEME_TOKENS = {
   '--ground': '#f5f4ee',
   '--surface': '#fbfaf6',
   '--raised': '#efeee7',
@@ -29,16 +29,85 @@ const APPROVED_SECOND_VERSION_TOKENS = {
   '--selection': '#f0d9cc',
 }
 
-// [测试意图] 锁定用户确认的第二版奶油纸感 + 陶土 UI，防止通用设计规则再次覆盖视觉方向。
-test('登录页保持第二版视觉 token', async ({ page }) => {
-  await page.goto('/login')
+const APPROVED_DARK_THEME_TOKENS = {
+  '--ground': '#141413',
+  '--surface': '#1f1e1d',
+  '--raised': '#2a2825',
+  '--active': '#34312d',
+  '--border': '#302e2a',
+  '--rule': '#282623',
+  '--control': '#4a463f',
+  '--control-hover': '#6a645b',
+  '--text': '#faf9f5',
+  '--text-hover': '#ffffff',
+  '--muted': '#b0aea6',
+  '--faint': '#878680',
+  '--accent': '#cb7b5e',
+  '--accent-soft': '#38251f',
+  '--accent-strong': '#e7a086',
+  '--info': '#8fb5df',
+  '--info-soft': '#1b2a39',
+  '--sage': '#9ab782',
+  '--positive': '#80c99a',
+  '--positive-soft': '#1a2b21',
+  '--negative': '#f28b82',
+  '--negative-soft': '#351e1c',
+  '--negative-border': '#6f3934',
+  '--warning': '#e4b866',
+  '--warning-soft': '#342a19',
+  '--selection': '#402c24',
+  '--art-peach': '#e5cab9',
+  '--art-coral': '#cb7b5e',
+  '--art-blue': '#769bc8',
+  '--art-lavender': '#817fb8',
+  '--art-mist': '#c0d0ca',
+  '--art-sage': '#6f9788',
+  '--art-ink': '#141413',
+}
 
-  const actual = await page.evaluate((names) => {
+async function readThemeTokens(page, names) {
+  return page.evaluate((tokenNames) => {
     const styles = getComputedStyle(document.documentElement)
     return Object.fromEntries(
-      names.map((name) => [name, styles.getPropertyValue(name).trim()]),
+      tokenNames.map((name) => [name, styles.getPropertyValue(name).trim()]),
     )
-  }, Object.keys(APPROVED_SECOND_VERSION_TOKENS))
+  }, names)
+}
 
-  expect(actual).toEqual(APPROVED_SECOND_VERSION_TOKENS)
+// [测试意图] 首次访问必须进入黑夜主题，锁定从参考图取样的背景、文字和档案色。
+test('首次访问默认使用黑夜主题 token', async ({ page }) => {
+  await page.goto('/login')
+
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+  await expect(page.locator('html')).toHaveClass(/\bdark\b/)
+
+  const actual = await readThemeTokens(
+    page,
+    Object.keys(APPROVED_DARK_THEME_TOKENS),
+  )
+  expect(actual).toEqual(APPROVED_DARK_THEME_TOKENS)
+})
+
+// [测试意图] 登录页可切换并持久化浅色主题，同时保留已验收的暖白 token。
+test('登录页切换浅色主题并在刷新后保留', async ({ page }) => {
+  await page.goto('/login')
+
+  const toggle = page.getByRole('button', { name: '切换到浅色主题' })
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true')
+  await toggle.click()
+
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
+  await expect(page.locator('html')).not.toHaveClass(/\bdark\b/)
+  await expect(
+    page.getByRole('button', { name: '切换到黑夜主题' }),
+  ).toHaveAttribute('aria-pressed', 'false')
+
+  const actual = await readThemeTokens(
+    page,
+    Object.keys(APPROVED_LIGHT_THEME_TOKENS),
+  )
+  expect(actual).toEqual(APPROVED_LIGHT_THEME_TOKENS)
+
+  await page.reload()
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
 })

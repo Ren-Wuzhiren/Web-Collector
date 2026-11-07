@@ -48,6 +48,23 @@ defineProps({
       <path d="M20 11a8 8 0 1 0-2.3 5.7" />
       <path d="M20 4v7h-7" />
     </g>
+    <g v-else-if="name === 'sun'">
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+    </g>
+    <g v-else-if="name === 'moon'">
+      <path d="M20.2 15.4A8.5 8.5 0 0 1 8.6 3.8a8.5 8.5 0 1 0 11.6 11.6Z" />
+    </g>
+    <g v-else-if="name === 'grid'">
+      <rect x="3.5" y="3.5" width="7" height="7" rx="1" />
+      <rect x="13.5" y="3.5" width="7" height="7" rx="1" />
+      <rect x="3.5" y="13.5" width="7" height="7" rx="1" />
+      <rect x="13.5" y="13.5" width="7" height="7" rx="1" />
+    </g>
+    <g v-else-if="name === 'list'">
+      <path d="M9 6h11M9 12h11M9 18h11" />
+      <path d="M4 6h.01M4 12h.01M4 18h.01" />
+    </g>
     <g v-else-if="name === 'external'">
       <path d="M14 4h6v6" />
       <path d="M20 4l-9 9" />

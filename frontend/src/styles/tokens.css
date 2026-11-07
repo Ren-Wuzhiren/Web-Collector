@@ -1,5 +1,5 @@
 :root {
-  /* 配色：暖白纸感底 + 近黑墨色文字 + 陶土主色。色值见 design.md §1 */
+  /* 当前首要规范见 design_dark_theme.md；浅色保留已验收的暖白 + 陶土基线。 */
   --ground: #f5f4ee;
   --surface: #fbfaf6;
   --raised: #efeee7;
@@ -26,30 +26,43 @@
   --warning: #8a5a12;
   --warning-soft: #faf0dc;
   --selection: #f0d9cc;
+  --on-primary: #fbfaf6;
+  --overlay-scrim: rgb(20 20 19 / 32%);
 
-  /* 圆角：按钮用胶囊，面板 16px，输入框 10px */
-  --radius-panel: 16px;
+  /* 参考图取样得到的档案色块，两套主题保持一致。 */
+  --art-peach: #e5cab9;
+  --art-coral: #cb7b5e;
+  --art-blue: #769bc8;
+  --art-lavender: #817fb8;
+  --art-mist: #c0d0ca;
+  --art-sage: #6f9788;
+  --art-ink: #141413;
+
+  /* 圆角：按钮用胶囊，面板 20px，输入框 10px */
+  --radius-panel: 20px;
   --radius-control: 10px;
   --radius-pill: 999px;
 
   /* 布局尺寸 */
-  --sidebar-width: 248px;
-  --content-width: 1240px;
-  --gap: 16px;
-  --section-gap: 48px;
+  --content-width: 1280px;
+  --topbar-height: 68px;
+  --gap: 24px;
+  --section-gap: 72px;
   --page-pad: 40px;
-  --control-height: 40px;
-  --row-height: 68px;
+  --card-pad: 24px;
+  --control-height: 36px;
+  --field-height: 40px;
+  --row-height: 64px;
 
-  /* 字号层级：display > title > section > body > small */
-  --font-size-display: 44px;
-  --font-size-title: 32px;
+  /* 字号层级：editorial > title > section > body > small */
+  --font-size-editorial: 56px;
+  --font-size-title: 36px;
   --font-size-section: 20px;
   --font-size-body: 15px;
   --font-size-small: 13px;
   --font-size-caption: 12px;
 
-  --line-height-display: 1.1;
+  --line-height-display: 1.05;
   --line-height-title: 1.2;
   --line-height-body: 1.6;
   --line-height-ui: 1.45;
@@ -62,4 +75,55 @@
   --font-reading: "Noto Serif SC Variable", "Noto Serif SC", "Songti SC", serif;
   /* 标题走衬线，正文与控件走无衬线：与参考站的 serif 标题 + grotesque 正文对应 */
   --font-display: var(--font-reading);
+}
+
+:root[data-theme="dark"],
+:root.dark {
+  --ground: #141413;
+  --surface: #1f1e1d;
+  --raised: #2a2825;
+  --active: #34312d;
+  --border: #302e2a;
+  --rule: #282623;
+  --control: #4a463f;
+  --control-hover: #6a645b;
+  --text: #faf9f5;
+  --text-hover: #ffffff;
+  --muted: #b0aea6;
+  --faint: #878680;
+  --accent: #cb7b5e;
+  --accent-soft: #38251f;
+  --accent-strong: #e7a086;
+  --info: #8fb5df;
+  --info-soft: #1b2a39;
+  --sage: #9ab782;
+  --positive: #80c99a;
+  --positive-soft: #1a2b21;
+  --negative: #f28b82;
+  --negative-soft: #351e1c;
+  --negative-border: #6f3934;
+  --warning: #e4b866;
+  --warning-soft: #342a19;
+  --selection: #402c24;
+  --on-primary: #141413;
+  --overlay-scrim: rgb(5 5 4 / 72%);
+}
+
+@media (max-width: 900px) {
+  :root {
+    --page-pad: 20px;
+    --section-gap: 48px;
+    --font-size-editorial: 44px;
+    --font-size-title: 32px;
+    --card-pad: 20px;
+  }
+}
+
+@media (max-width: 640px) {
+  :root {
+    --page-pad: 16px;
+    --section-gap: 36px;
+    --font-size-editorial: 36px;
+    --font-size-title: 28px;
+  }
 }

@@ -3,6 +3,7 @@ import { computed, nextTick, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import ArchiveMark from '../components/ArchiveMark.vue'
+import ThemeToggle from '../components/ThemeToggle.vue'
 import { useAuthStore } from '../stores/auth'
 
 const router = useRouter()
@@ -86,8 +87,11 @@ async function submit() {
   <main class="login-page">
     <section class="intro-panel" aria-labelledby="product-title">
       <header class="product-identity">
-        <ArchiveMark :size="32" />
-        <h1 id="product-title">WebCollector</h1>
+        <div class="product-brand">
+          <ArchiveMark :size="32" />
+          <h1 id="product-title">WebCollector</h1>
+        </div>
+        <ThemeToggle />
       </header>
 
       <div class="intro-copy">
@@ -238,6 +242,13 @@ async function submit() {
 }
 
 .product-identity {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.product-brand {
   display: flex;
   align-items: center;
   gap: 12px;
