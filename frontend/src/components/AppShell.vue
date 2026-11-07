@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ArchiveMark from './ArchiveMark.vue'
 import AppIcon from './AppIcon.vue'
+import ThemeToggle from './ThemeToggle.vue'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
@@ -61,59 +62,60 @@ async function logout() {
   <div class="app-layout">
     <a class="skip-link" href="#main-content">跳到主要内容</a>
 
-    <aside class="sidebar" aria-label="主导航">
-      <router-link class="brand" to="/links" aria-label="WebCollector 收藏">
-        <span class="brand-mark">
-          <ArchiveMark :size="30" />
-        </span>
-        <span class="brand-copy">
-          <strong>WebCollector</strong>
-          <small>个人档案</small>
-        </span>
-      </router-link>
-
-      <nav class="nav-group" aria-label="档案页面">
-        <p class="nav-label">我的档案</p>
-        <router-link
-          v-for="item in navItems"
-          :key="item.to"
-          class="nav-item"
-          :to="item.to"
-          active-class="is-active"
-        >
-          <AppIcon :name="item.icon" :size="17" />
-          <span>{{ item.label }}</span>
+    <header class="site-header">
+      <div class="header-inner">
+        <router-link class="brand" to="/links" aria-label="WebCollector 收藏">
+          <span class="brand-mark">
+            <ArchiveMark :size="28" />
+          </span>
+          <span class="brand-copy">
+            <strong>WebCollector</strong>
+            <small>个人档案</small>
+          </span>
         </router-link>
-      </nav>
 
-      <div class="account-row">
-        <span class="account-avatar" aria-hidden="true">
-          {{ auth.user?.username?.slice(0, 1)?.toUpperCase() || 'U' }}
-        </span>
-        <span class="account-copy">
-          <strong>{{ auth.user?.username || '当前账号' }}</strong>
-          <small>自托管档案</small>
-        </span>
-        <button class="icon-button" type="button" aria-label="退出登录" @click="logout">
-          <AppIcon name="logout" :size="17" />
-        </button>
+        <nav class="desktop-nav" aria-label="主导航">
+          <router-link
+            v-for="item in navItems"
+            :key="item.to"
+            class="nav-item"
+            :to="item.to"
+            active-class="is-active"
+          >
+            <AppIcon :name="item.icon" :size="16" />
+            <span>{{ item.label }}</span>
+          </router-link>
+        </nav>
+
+        <div class="header-actions">
+          <ThemeToggle compact />
+
+          <div class="account-cluster">
+            <span class="account-avatar" aria-hidden="true">
+              {{ auth.user?.username?.slice(0, 1)?.toUpperCase() || 'U' }}
+            </span>
+            <span class="account-name">{{ auth.user?.username || '当前账号' }}</span>
+            <button
+              class="icon-button"
+              type="button"
+              aria-label="退出登录"
+              @click="logout"
+            >
+              <AppIcon name="logout" :size="17" />
+            </button>
+          </div>
+
+          <button
+            class="mobile-menu"
+            type="button"
+            aria-label="打开导航"
+            :aria-expanded="mobileOpen"
+            @click="mobileOpen = true"
+          >
+            <AppIcon name="menu" :size="20" />
+          </button>
+        </div>
       </div>
-    </aside>
-
-    <header class="mobile-bar">
-      <button
-        class="mobile-menu"
-        type="button"
-        aria-label="打开导航"
-        :aria-expanded="mobileOpen"
-        @click="mobileOpen = true"
-      >
-        <AppIcon name="menu" :size="20" />
-      </button>
-      <span class="mobile-title">{{ currentTitle }}</span>
-      <span class="mobile-brand-mark" aria-hidden="true">
-        <ArchiveMark :size="22" />
-      </span>
     </header>
 
     <main id="main-content" class="app-main" tabindex="-1">
@@ -133,11 +135,11 @@ async function logout() {
           <header class="mobile-sheet-head">
             <router-link class="brand" to="/links">
               <span class="brand-mark">
-                <ArchiveMark :size="30" />
+                <ArchiveMark :size="28" />
               </span>
               <span class="brand-copy">
                 <strong>WebCollector</strong>
-                <small>个人档案</small>
+                <small>{{ currentTitle }}</small>
               </span>
             </router-link>
             <button
@@ -149,6 +151,7 @@ async function logout() {
               <AppIcon name="close" :size="20" />
             </button>
           </header>
+
           <nav class="mobile-nav" aria-label="移动端主导航">
             <router-link
               v-for="item in navItems"
@@ -162,6 +165,7 @@ async function logout() {
               <AppIcon class="mobile-chevron" name="chevron" :size="16" />
             </router-link>
           </nav>
+
           <div class="mobile-account">
             <span class="account-avatar" aria-hidden="true">
               {{ auth.user?.username?.slice(0, 1)?.toUpperCase() || 'U' }}
@@ -181,8 +185,6 @@ async function logout() {
 <style scoped>
 .app-layout {
   min-height: 100svh;
-  display: grid;
-  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
   background: var(--ground);
 }
 
@@ -192,8 +194,8 @@ async function logout() {
   left: 8px;
   z-index: 100;
   padding: 10px 14px;
-  border-radius: var(--radius-control);
-  color: var(--surface);
+  border-radius: var(--radius-pill);
+  color: var(--on-primary);
   background: var(--text);
   text-decoration: none;
   transform: translateY(-160%);
@@ -204,79 +206,76 @@ async function logout() {
   transform: translateY(0);
 }
 
-.sidebar {
+.site-header {
   position: sticky;
   top: 0;
-  height: 100svh;
-  padding: 24px 16px 18px;
-  display: flex;
-  flex-direction: column;
-  border-right: 1px solid var(--border);
+  z-index: 30;
+  height: var(--topbar-height);
+  border-bottom: 1px solid var(--border);
+  background: var(--ground);
+}
+
+.header-inner {
+  width: min(var(--content-width), calc(100% - (2 * var(--page-pad))));
+  height: 100%;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(190px, 1fr) auto minmax(190px, 1fr);
+  align-items: center;
+  gap: 28px;
 }
 
 .brand {
-  min-height: 44px;
+  width: fit-content;
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: 0 8px 38px;
   color: var(--text);
   text-decoration: none;
 }
 
-.brand-mark,
-.mobile-brand-mark {
+.brand-mark {
   display: grid;
   place-items: center;
   color: var(--text);
 }
 
-.brand-mark {
-  width: 32px;
-  height: 34px;
-}
-
 .brand-copy {
-  min-width: 0;
   display: grid;
-  gap: 1px;
+  gap: 0;
 }
 
 .brand-copy strong {
   font-family: var(--font-display);
   font-size: 18px;
   font-weight: 500;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
 }
 
-.brand-copy small,
-.account-copy small {
+.brand-copy small {
   color: var(--muted);
   font-size: 11px;
   line-height: 1.35;
 }
 
-.nav-group {
-  display: grid;
+.desktop-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   gap: 4px;
 }
 
-.nav-label {
-  margin: 0 10px 10px;
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.4;
-}
-
 .nav-item {
-  min-height: 38px;
-  padding: 0 10px;
-  display: flex;
+  min-height: 40px;
+  padding: 0 12px;
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
-  border-radius: var(--radius-control);
+  gap: 7px;
+  border-radius: var(--radius-pill);
   color: var(--muted);
   text-decoration: none;
+  font-size: var(--font-size-small);
   transition:
     color var(--motion-fast) var(--ease-out),
     background-color var(--motion-fast) var(--ease-out);
@@ -284,7 +283,7 @@ async function logout() {
 
 .nav-item:hover {
   color: var(--text);
-  background: rgb(255 255 255 / 58%);
+  background: var(--raised);
 }
 
 .nav-item.is-active {
@@ -292,21 +291,24 @@ async function logout() {
   background: var(--active);
 }
 
-.account-row {
-  min-width: 0;
-  min-height: 58px;
-  margin-top: auto;
-  padding: 10px 8px;
-  display: grid;
-  grid-template-columns: 32px minmax(0, 1fr) 32px;
+.header-actions {
+  display: flex;
   align-items: center;
-  gap: 9px;
-  border-top: 1px solid var(--border);
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.account-cluster {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .account-avatar {
   width: 32px;
   height: 32px;
+  flex: none;
   display: grid;
   place-items: center;
   border-radius: 50%;
@@ -314,6 +316,15 @@ async function logout() {
   background: var(--active);
   font-size: 12px;
   font-weight: 600;
+}
+
+.account-name {
+  max-width: 110px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: var(--font-size-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .account-copy {
@@ -324,9 +335,14 @@ async function logout() {
 .account-copy strong {
   overflow: hidden;
   font-size: 13px;
-  font-weight: 550;
+  font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.account-copy small {
+  color: var(--muted);
+  font-size: 11px;
 }
 
 .icon-button,
@@ -338,65 +354,66 @@ async function logout() {
 }
 
 .icon-button {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   display: grid;
   place-items: center;
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-pill);
 }
 
 .icon-button:hover {
   color: var(--text);
-  background: var(--active);
+  background: var(--raised);
+}
+
+.mobile-menu {
+  width: 44px;
+  height: 44px;
+  display: none;
+  place-items: center;
+  border-radius: var(--radius-pill);
 }
 
 .app-main {
   min-width: 0;
 }
 
-.mobile-bar,
 .mobile-sheet {
   display: none;
 }
 
-@media (max-width: 900px) {
-  .app-layout {
-    display: block;
+@media (max-width: 1080px) {
+  .header-inner {
+    grid-template-columns: auto 1fr auto;
   }
 
-  .sidebar {
+  .account-name {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .site-header {
+    height: 56px;
+  }
+
+  .header-inner {
+    width: calc(100% - 24px);
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 4px;
+  }
+
+  .brand-copy small {
     display: none;
   }
 
-  .mobile-bar {
-    position: sticky;
-    top: 0;
-    z-index: 20;
-    height: 48px;
-    padding: 0 8px;
-    display: grid;
-    grid-template-columns: 44px minmax(0, 1fr) 44px;
-    align-items: center;
-    border-bottom: 1px solid var(--border);
-    background: var(--ground);
+  .desktop-nav,
+  .account-cluster {
+    display: none;
   }
 
   .mobile-menu {
-    width: 44px;
-    height: 44px;
     display: grid;
-    place-items: center;
-  }
-
-  .mobile-title {
-    text-align: center;
-    font-size: 14px;
-    font-weight: 550;
-  }
-
-  .mobile-brand-mark {
-    width: 44px;
-    height: 44px;
   }
 
   .mobile-sheet {
@@ -404,7 +421,7 @@ async function logout() {
     inset: 0;
     z-index: 50;
     display: block;
-    background: rgb(10 10 10 / 24%);
+    background: var(--overlay-scrim);
   }
 
   .mobile-sheet-panel {
@@ -417,18 +434,14 @@ async function logout() {
   }
 
   .mobile-sheet-head {
-    min-height: 48px;
+    min-height: 52px;
     display: flex;
     align-items: center;
     justify-content: space-between;
   }
 
-  .mobile-sheet-head .brand {
-    margin: 0;
-  }
-
   .mobile-nav {
-    margin-top: 30px;
+    margin-top: 26px;
     display: grid;
     gap: 4px;
   }
@@ -440,7 +453,7 @@ async function logout() {
     grid-template-columns: 24px minmax(0, 1fr) 20px;
     align-items: center;
     gap: 10px;
-    border-radius: var(--radius-control);
+    border-radius: var(--radius-pill);
     color: var(--muted);
     text-decoration: none;
   }

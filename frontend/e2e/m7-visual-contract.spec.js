@@ -111,3 +111,59 @@ test('登录页切换浅色主题并在刷新后保留', async ({ page }) => {
   await page.reload()
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
 })
+
+// [测试意图] 认证后使用参考图式顶部导航，桌面不再依赖左侧栏承载主入口。
+test('收藏页使用顶部主导航和全局主题开关', async ({ page }) => {
+  await page.goto('/login')
+  await page.evaluate(() => {
+    localStorage.setItem('webcollector-token', 'theme-shell-token')
+  })
+  await page.route('**/api/v1/auth/me', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        data: {
+          id: 7,
+          username: 'reader',
+          email: 'reader@example.com',
+          role: 'USER',
+          createdAt: '2026-11-07T00:00:00Z',
+        },
+        message: 'success',
+        requestId: 'theme-shell',
+      }),
+    })
+  })
+  for (const [path, data] of [
+    ['collections', []],
+    ['tags', []],
+    ['links', []],
+  ]) {
+    await page.route(`**/api/v1/${path}`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data,
+          message: 'success',
+          requestId: `theme-${path}`,
+        }),
+      })
+    })
+  }
+
+  await page.goto('/links')
+
+  await expect(page.locator('.sidebar')).toHaveCount(0)
+  await expect(page.getByRole('banner')).toBeVisible()
+  await expect(page.getByRole('navigation', { name: '主导航' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '切换到浅色主题' })).toBeVisible()
+
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.getByRole('button', { name: '打开导航' }).click()
+  await expect(page.getByRole('dialog', { name: '导航' })).toBeVisible()
+  await expect(
+    page.getByRole('navigation', { name: '移动端主导航' }),
+  ).toBeVisible()
+})
