@@ -1,31 +1,31 @@
 :root {
-  /* 配色：暖白纸感底 + 近黑墨色文字 + 陶土主色。色值见 design.md §1 */
-  --ground: #f5f4ee;
-  --surface: #fbfaf6;
-  --raised: #efeee7;
-  --active: #e8e6dc;
-  --border: #dcd9cd;
-  --rule: #e8e6dc;
-  --control: #c9c5b7;
-  --control-hover: #a9a597;
-  --text: #141413;
-  --text-hover: #3d3d3a;
-  --muted: #5e5d59;
-  --faint: #87867f;
-  --accent: #c96442;
-  --accent-soft: #f5e6de;
-  --accent-strong: #a84f31;
-  --info: #3f6fa6;
-  --info-soft: #e6eef7;
-  --sage: #5f7a48;
-  --positive: #4f6b3a;
-  --positive-soft: #e7eedd;
-  --negative: #b3261e;
-  --negative-soft: #f9e6e3;
-  --negative-border: #ebc2bc;
-  --warning: #8a5a12;
-  --warning-soft: #faf0dc;
-  --selection: #f0d9cc;
+  /* 配色：Achromatic ledger，冷灰底与中性面板只让语义色承担数据和状态。 */
+  --ground: #f2f4f7;
+  --surface: #ffffff;
+  --raised: #f7f9fb;
+  --active: #e7ebf0;
+  --border: #e1e5eb;
+  --rule: #edf0f4;
+  --control: #cfd5dd;
+  --control-hover: #b8c0ca;
+  --text: #0a0a0a;
+  --text-hover: #2c3138;
+  --muted: #59616e;
+  --faint: #68717d;
+  --accent: #1d5fbf;
+  --accent-soft: #e8f0fb;
+  --accent-strong: #174b97;
+  --info: #1d5fbf;
+  --info-soft: #e8f0fb;
+  --sage: #3f7a5a;
+  --positive: #247b50;
+  --positive-soft: #e7f5ee;
+  --negative: #b42318;
+  --negative-soft: #fdecea;
+  --negative-border: #f2b8b5;
+  --warning: #92400e;
+  --warning-soft: #fdf2e3;
+  --selection: #dce8fa;
 
   /* 圆角：按钮用胶囊，面板 16px，输入框 10px */
   --radius-panel: 16px;

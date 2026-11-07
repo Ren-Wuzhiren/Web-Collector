@@ -26,6 +26,7 @@ const savingTags = ref(false)
 const editOpen = ref(false)
 const savingMetadata = ref(false)
 const screenshotUrl = ref('')
+const transitionTitle = ref('')
 
 const editForm = reactive({
   title: '',
@@ -68,6 +69,9 @@ const domain = computed(() => {
 })
 
 const displayTitle = computed(() => link.value?.title?.trim() || domain.value || '未命名网页')
+const transitionTitleName = computed(
+  () => `link-title-${route.params.id}`,
+)
 
 const evidenceRows = computed(() =>
   ['HTML', 'PDF', 'SCREENSHOT'].map((format) => {
@@ -148,6 +152,7 @@ onBeforeUnmount(() => {
 async function loadDetail() {
   const sequence = ++requestSequence
   const linkId = Number(route.params.id)
+  transitionTitle.value = window.history.state?.transitionTitle || ''
 
   stopJobPolling()
   revokeScreenshot()
@@ -471,7 +476,15 @@ function formatBytes(bytes) {
   <section class="detail-page">
     <div v-if="loading" class="detail-skeleton" aria-label="正在加载链接详情">
       <div class="skeleton-line skeleton-back"></div>
-      <div class="skeleton-line skeleton-title"></div>
+      <h1
+        v-if="transitionTitle"
+        class="detail-loading-title"
+        data-testid="detail-loading-title"
+        :style="{ 'view-transition-name': transitionTitleName }"
+      >
+        {{ transitionTitle }}
+      </h1>
+      <div v-else class="skeleton-line skeleton-title"></div>
       <div class="skeleton-line skeleton-copy"></div>
       <div class="skeleton-grid">
         <div class="skeleton-panel skeleton-reading"></div>
@@ -511,7 +524,7 @@ function formatBytes(bytes) {
             <span aria-hidden="true">·</span>
             <span>{{ catalog.collectionName(link.collectionId) }}</span>
           </div>
-          <h1 :style="{ 'view-transition-name': `link-title-${link.id}` }">{{ displayTitle }}</h1>
+          <h1 :style="{ 'view-transition-name': transitionTitleName }">{{ displayTitle }}</h1>
           <p v-if="link.description" class="detail-description">{{ link.description }}</p>
           <div class="readiness" :class="`is-${readiness.tone}`">
             <span class="readiness-mark" aria-hidden="true"></span>
@@ -1462,6 +1475,16 @@ h1 {
   width: min(720px, 78%);
   height: 32px;
   margin-top: 10px;
+}
+
+.detail-loading-title {
+  max-width: 820px;
+  margin: 8px 0 0;
+  font-size: 24px;
+  font-weight: 650;
+  line-height: 32px;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
 }
 
 .skeleton-copy {

@@ -130,9 +130,12 @@ function countForCollection(collection) {
 }
 
 function openLink(link, navigate, event) {
-  if (!shouldUseViewTransition(event)) return navigate(event)
+  const titleElement = event.currentTarget.querySelector('h3')
+  if (!shouldUseViewTransition(event, titleElement)) return navigate(event)
   event.preventDefault()
-  navigateWithTransition(router, `/links/${link.id}`)
+  navigateWithTransition(router, `/links/${link.id}`, {
+    transitionTitle: link.title || '未命名网页',
+  })
 }
 </script>
 
