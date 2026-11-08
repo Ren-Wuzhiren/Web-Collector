@@ -1,5 +1,7 @@
 package com.webcollector.capture.worker;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.spi.ILoggingEvent;
 import com.webcollector.capture.asset.entity.AssetFormat;
 import com.webcollector.capture.asset.service.AssetRegistrationService;
 import com.webcollector.capture.browser.BrowserCaptureArtifacts;
@@ -12,6 +14,7 @@ import com.webcollector.capture.entity.CaptureJobStatus;
 import com.webcollector.capture.service.CaptureJobService;
 import com.webcollector.link.entity.Link;
 import com.webcollector.link.mapper.LinkMapper;
+import com.webcollector.support.LogCapture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -89,7 +92,35 @@ class CaptureWorkerTest {
         )).thenReturn(artifacts);
         when(captureJobService.complete(11L)).thenReturn(succeeded);
 
-        Optional<CaptureJobSummary> result = worker.runOnce();
+        Optional<CaptureJobSummary> result;
+
+        try (LogCapture logs = LogCapture.attach(CaptureWorker.class)) {
+            result = worker.runOnce();
+
+            ILoggingEvent summary = onlyEvent(
+                    logs,
+                    "event=capture.job.finished"
+            );
+            assertThat(summary.getLevel()).isEqualTo(Level.INFO);
+            assertThat(summary.getThrowableProxy()).isNull();
+            assertThat(summary.getFormattedMessage())
+                    .contains(
+                            "workerId=worker-test",
+                            "jobId=11",
+                            "linkId=21",
+                            "attempt=1",
+                            "status=SUCCEEDED",
+                            "html=1",
+                            "pdf=1",
+                            "screenshot=1",
+                            "cleanup=SUCCEEDED",
+                            "errorCode=NONE"
+                    )
+                    .doesNotContain(
+                            "https://example.com/article",
+                            tempDirectory.toString()
+                    );
+        }
 
         assertThat(result).contains(succeeded);
         verify(persistenceService).persist(21L, artifacts.html().path());
@@ -115,7 +146,25 @@ class CaptureWorkerTest {
         when(captureJobService.fail(11L, "CAPTURE_LINK_NOT_FOUND", "任务关联的链接不存在"))
                 .thenReturn(pending);
 
-        assertThat(worker.runOnce()).contains(pending);
+        try (LogCapture logs = LogCapture.attach(CaptureWorker.class)) {
+            assertThat(worker.runOnce()).contains(pending);
+
+            ILoggingEvent summary = onlyEvent(
+                    logs,
+                    "event=capture.job.finished"
+            );
+            assertThat(summary.getLevel()).isEqualTo(Level.WARN);
+            assertThat(summary.getFormattedMessage())
+                    .contains(
+                            "status=PENDING",
+                            "html=0",
+                            "pdf=0",
+                            "screenshot=0",
+                            "cleanup=NOT_REQUIRED",
+                            "errorCode=CAPTURE_LINK_NOT_FOUND"
+                    )
+                    .doesNotContain("https://example.com/article");
+        }
 
         verify(browserHtmlCapture, never()).captureSnapshot(any(), any());
         verify(persistenceService, never()).persist(any(), any());
@@ -135,7 +184,27 @@ class CaptureWorkerTest {
         when(browserHtmlCapture.captureSnapshot(eq("https://example.com/article"), any()))
                 .thenThrow(new IllegalStateException("capture failed"));
 
-        assertThat(worker.runOnce()).contains(pending);
+        try (LogCapture logs = LogCapture.attach(CaptureWorker.class)) {
+            assertThat(worker.runOnce()).contains(pending);
+
+            ILoggingEvent summary = onlyEvent(
+                    logs,
+                    "event=capture.job.finished"
+            );
+            assertThat(summary.getLevel()).isEqualTo(Level.WARN);
+            assertThat(summary.getThrowableProxy()).isNull();
+            assertThat(summary.getFormattedMessage())
+                    .contains(
+                            "status=PENDING",
+                            "cleanup=SUCCEEDED",
+                            "errorCode=CAPTURE_EXECUTION_FAILED"
+                    )
+                    .doesNotContain(
+                            "capture failed",
+                            "https://example.com/article",
+                            tempDirectory.toString()
+                    );
+        }
 
         verify(persistenceService, never()).persist(any(), any());
         verify(assetRegistrationService, never()).register(any(), any(), any());
@@ -178,9 +247,24 @@ class CaptureWorkerTest {
         org.mockito.Mockito.doThrow(new IllegalStateException("transition failed"))
                 .when(captureJobService).complete(11L);
 
-        assertThatThrownBy(() -> worker.runOnce())
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("transition failed");
+        try (LogCapture logs = LogCapture.attach(CaptureWorker.class)) {
+            assertThatThrownBy(() -> worker.runOnce())
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("transition failed");
+
+            ILoggingEvent summary = onlyEvent(
+                    logs,
+                    "event=capture.job.finished"
+            );
+            assertThat(summary.getLevel()).isEqualTo(Level.WARN);
+            assertThat(summary.getThrowableProxy()).isNull();
+            assertThat(summary.getFormattedMessage())
+                    .contains(
+                            "status=UNKNOWN",
+                            "errorCode=STATE_TRANSITION_FAILED"
+                    )
+                    .doesNotContain("transition failed");
+        }
 
         verify(captureJobService, never()).fail(any(), any(), any());
     }
@@ -201,7 +285,22 @@ class CaptureWorkerTest {
         doThrow(new IOException("cleanup failed"))
                 .when(workerWithCleanupFailure).cleanupWorkDirectory(any(Path.class));
 
-        assertThat(workerWithCleanupFailure.runOnce()).contains(succeeded);
+        try (LogCapture logs = LogCapture.attach(CaptureWorker.class)) {
+            assertThat(workerWithCleanupFailure.runOnce()).contains(succeeded);
+
+            ILoggingEvent summary = onlyEvent(
+                    logs,
+                    "event=capture.job.finished"
+            );
+            assertThat(summary.getLevel()).isEqualTo(Level.WARN);
+            assertThat(summary.getFormattedMessage())
+                    .contains(
+                            "status=SUCCEEDED",
+                            "cleanup=FAILED",
+                            "errorCode=NONE"
+                    )
+                    .doesNotContain("cleanup failed", tempDirectory.toString());
+        }
 
         verify(captureJobService).complete(11L);
         verify(captureJobService, never()).fail(any(), any(), any());
@@ -216,6 +315,24 @@ class CaptureWorkerTest {
         assertThat(Files.isDirectory(root)).isTrue();
         assertThatThrownBy(() -> createdWorker.cleanupWorkDirectory(tempDirectory))
                 .isInstanceOf(IOException.class);
+    }
+
+    // [测试意图] 验证空队列不产生周期性采集摘要噪音。
+    @Test
+    void shouldNotLogJobSummaryWhenQueueIsEmpty() {
+        when(captureJobService.claimNext(eq("worker-test"), any(LocalDateTime.class)))
+                .thenReturn(Optional.empty());
+
+        try (LogCapture logs = LogCapture.attach(CaptureWorker.class)) {
+            assertThat(worker.runOnce()).isEmpty();
+
+            assertThat(logs.containing("event=capture.job.finished")).isEmpty();
+        }
+    }
+
+    private ILoggingEvent onlyEvent(LogCapture logs, String eventName) {
+        assertThat(logs.containing(eventName)).hasSize(1);
+        return logs.containing(eventName).get(0);
     }
 
     private CaptureWorker newWorker(Path workRoot) throws IOException {

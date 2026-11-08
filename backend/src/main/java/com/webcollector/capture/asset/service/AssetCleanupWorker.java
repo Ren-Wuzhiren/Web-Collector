@@ -23,18 +23,68 @@ public class AssetCleanupWorker {
 
     @Scheduled(fixedDelayString = "${app.asset.cleanup.poll-interval-ms:5000}")
     public void processDueJobs() {
-        for (int processed = 0; processed < 50; processed++) {
+        long startedNanos = System.nanoTime();
+        int processedCount = 0;
+        int completed = 0;
+        int retried = 0;
+        String failureType = "NONE";
+
+        for (int index = 0; index < 50; index++) {
             AssetCleanupJob job = cleanupService.claimNext();
             if (job == null) {
-                return;
+                break;
             }
+            processedCount++;
             try {
                 storage.delete(job.getStoragePath());
                 cleanupService.complete(job.getId());
+                completed++;
             } catch (IOException | RuntimeException failure) {
                 cleanupService.retry(job, failure);
-                logger.warn("Asset cleanup job {} failed; it will be retried", job.getId(), failure);
+                retried++;
+                failureType = failure.getClass().getSimpleName();
             }
+        }
+
+        if (processedCount > 0) {
+            logBatchSummary(
+                    processedCount,
+                    completed,
+                    retried,
+                    failureType,
+                    (System.nanoTime() - startedNanos) / 1_000_000L
+            );
+        }
+    }
+
+    private void logBatchSummary(
+            int processed,
+            int completed,
+            int retried,
+            String failureType,
+            long durationMs
+    ) {
+        String message = "event=asset.cleanup.batch.finished processed={}"
+                + " completed={} retried={} failureType={} durationMs={}";
+
+        if (retried > 0) {
+            logger.warn(
+                    message,
+                    processed,
+                    completed,
+                    retried,
+                    failureType,
+                    durationMs
+            );
+        } else {
+            logger.info(
+                    message,
+                    processed,
+                    completed,
+                    retried,
+                    failureType,
+                    durationMs
+            );
         }
     }
 }

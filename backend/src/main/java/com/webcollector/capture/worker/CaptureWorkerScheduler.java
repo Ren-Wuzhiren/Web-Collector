@@ -38,18 +38,84 @@ public class CaptureWorkerScheduler {
             initialDelayString = "${app.capture.initial-delay-ms:10000}"
     )
     public void processDueJobs() {
-        for (int processed = 0; processed < batchSize; processed++) {
-            try {
-                if (captureWorker.runOnce().isEmpty()) {
-                    return;
+        long startedNanos = System.nanoTime();
+        int processedCount = 0;
+        int succeeded = 0;
+        int retried = 0;
+        int failed = 0;
+        int unexpected = 0;
+        String failureType = "NONE";
+
+        try {
+            for (int index = 0; index < batchSize; index++) {
+                try {
+                    var outcome = captureWorker.runOnce();
+                    if (outcome.isEmpty()) {
+                        return;
+                    }
+
+                    processedCount++;
+                    switch (outcome.orElseThrow().status()) {
+                        case SUCCEEDED -> succeeded++;
+                        case PENDING -> retried++;
+                        default -> failed++;
+                    }
+                } catch (RuntimeException failure) {
+                    unexpected = 1;
+                    failureType = failure.getClass().getSimpleName();
+                    break;
                 }
-            } catch (RuntimeException failure) {
-                logger.error(
-                        "Capture worker scheduler stopped this batch after an unexpected failure",
-                        failure
-                );
-                return;
             }
+        } finally {
+            if (processedCount > 0 || unexpected > 0) {
+                logBatchSummary(
+                        processedCount,
+                        succeeded,
+                        retried,
+                        failed,
+                        unexpected,
+                        failureType,
+                        (System.nanoTime() - startedNanos) / 1_000_000L
+                );
+            }
+        }
+    }
+
+    private void logBatchSummary(
+            int processed,
+            int succeeded,
+            int retried,
+            int failed,
+            int unexpected,
+            String failureType,
+            long durationMs
+    ) {
+        String message = "event=capture.batch.finished processed={}"
+                + " succeeded={} retried={} failed={} unexpected={}"
+                + " failureType={} durationMs={}";
+
+        if (unexpected > 0 || retried > 0 || failed > 0) {
+            logger.warn(
+                    message,
+                    processed,
+                    succeeded,
+                    retried,
+                    failed,
+                    unexpected,
+                    failureType,
+                    durationMs
+            );
+        } else {
+            logger.info(
+                    message,
+                    processed,
+                    succeeded,
+                    retried,
+                    failed,
+                    unexpected,
+                    failureType,
+                    durationMs
+            );
         }
     }
 }

@@ -90,19 +90,31 @@ public class CaptureWorker {
         }
 
         CaptureJobSummary job = claimed.orElseThrow();
-        Link link = linkMapper.selectById(job.linkId());
-        if (link == null) {
-            return Optional.of(captureJobService.fail(
-                    job.id(),
-                    LINK_NOT_FOUND,
-                    "任务关联的链接不存在"
-            ));
-        }
-
+        long startedNanos = System.nanoTime();
+        String errorCode = "NONE";
+        int htmlSuccesses = 0;
+        int pdfSuccesses = 0;
+        int screenshotSuccesses = 0;
+        boolean cleanupAttempted = false;
+        boolean cleanupFailed = false;
+        CaptureJobSummary outcome = null;
         Path jobDirectory = null;
+
         try {
+            Link link = linkMapper.selectById(job.linkId());
+            if (link == null) {
+                errorCode = LINK_NOT_FOUND;
+                outcome = captureJobService.fail(
+                        job.id(),
+                        LINK_NOT_FOUND,
+                        "任务关联的链接不存在"
+                );
+                return Optional.of(outcome);
+            }
+
             try {
                 jobDirectory = createJobDirectory(job.id());
+                cleanupAttempted = true;
                 BrowserCaptureArtifacts artifacts = browserHtmlCapture.captureSnapshot(
                         link.getOriginalUrl(),
                         jobDirectory
@@ -111,33 +123,92 @@ public class CaptureWorker {
                     throw new IllegalStateException("快照没有成功生成的格式");
                 }
 
+                htmlSuccesses = successCount(artifacts.html());
+                pdfSuccesses = successCount(artifacts.pdf());
+                screenshotSuccesses = successCount(artifacts.screenshot());
                 persistReadableText(job, artifacts.html());
                 registerSucceededFormats(job.id(), artifacts);
             } catch (Exception failure) {
-                logger.warn(
-                        "Capture job {} failed during execution ({})",
-                        job.id(),
-                        failure.getClass().getSimpleName()
-                );
-                return Optional.of(captureJobService.fail(
+                errorCode = EXECUTION_FAILED;
+                outcome = captureJobService.fail(
                         job.id(),
                         EXECUTION_FAILED,
                         "抓取、正文或资产登记失败: " + failure.getClass().getSimpleName()
-                ));
+                );
+                return Optional.of(outcome);
             }
-            return Optional.of(captureJobService.complete(job.id()));
+
+            try {
+                outcome = captureJobService.complete(job.id());
+                return Optional.of(outcome);
+            } catch (RuntimeException failure) {
+                errorCode = "STATE_TRANSITION_FAILED";
+                throw failure;
+            }
         } finally {
             if (jobDirectory != null) {
                 try {
                     cleanupWorkDirectory(jobDirectory);
                 } catch (IOException | RuntimeException cleanupFailure) {
-                    logger.warn(
-                            "Temporary directory cleanup for capture job {} failed ({})",
-                            job.id(),
-                            cleanupFailure.getClass().getSimpleName()
-                    );
+                    cleanupFailed = true;
                 }
             }
+
+            logJobSummary(
+                    job,
+                    outcome,
+                    errorCode,
+                    htmlSuccesses,
+                    pdfSuccesses,
+                    screenshotSuccesses,
+                    cleanupAttempted,
+                    cleanupFailed,
+                    (System.nanoTime() - startedNanos) / 1_000_000L
+            );
+        }
+    }
+
+    private int successCount(CaptureFormatResult result) {
+        return result.status() == CaptureFormatStatus.SUCCESS ? 1 : 0;
+    }
+
+    private void logJobSummary(
+            CaptureJobSummary job,
+            CaptureJobSummary outcome,
+            String errorCode,
+            int htmlSuccesses,
+            int pdfSuccesses,
+            int screenshotSuccesses,
+            boolean cleanupAttempted,
+            boolean cleanupFailed,
+            long durationMs
+    ) {
+        String status = outcome == null ? "UNKNOWN" : outcome.status().name();
+        String cleanup = !cleanupAttempted
+                ? "NOT_REQUIRED"
+                : cleanupFailed ? "FAILED" : "SUCCEEDED";
+        String message = "event=capture.job.finished"
+                + " workerId={} jobId={} linkId={} attempt={} status={}"
+                + " durationMs={} html={} pdf={} screenshot={}"
+                + " cleanup={} errorCode={}";
+        Object[] arguments = {
+                workerId,
+                job.id(),
+                job.linkId(),
+                job.attemptCount(),
+                status,
+                durationMs,
+                htmlSuccesses,
+                pdfSuccesses,
+                screenshotSuccesses,
+                cleanup,
+                errorCode
+        };
+
+        if ("SUCCEEDED".equals(status) && !cleanupFailed) {
+            logger.info(message, arguments);
+        } else {
+            logger.warn(message, arguments);
         }
     }
 
