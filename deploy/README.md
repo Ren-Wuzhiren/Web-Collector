@@ -76,12 +76,41 @@ node --test .\scripts\tests\promote-demo-admin.test.mjs
 ## 备份与恢复
 
 ```powershell
-$env:MYSQL_PASSWORD = "从 .env 读取"
-.\deploy\backup.ps1
-.\deploy\restore.ps1 -BackupDirectory .\backups\20261102-230000
+.\deploy\backup.ps1 `
+  -ComposeFile .\deploy\docker-compose.yml `
+  -EnvFile .\deploy\.env `
+  -ProjectName webcollector-m8-acceptance `
+  -OutputRoot .\.superpowers\m8.2\backups
+
+.\deploy\restore.ps1 `
+  -ComposeFile .\deploy\docker-compose.yml `
+  -EnvFile .\deploy\.env `
+  -ProjectName webcollector-m8-acceptance `
+  -BackupDirectory .\.superpowers\m8.2\backups\20261108-152706-680
 ```
 
-备份包含 MySQL dump、资产目录和抓取工作目录。恢复前先停止写入并保留当前数据卷快照。
+所有 Compose 操作都会显式使用 `-p`、`--env-file` 和 `-f`，避免误连其他项目的数据卷。备份包含：
+
+- `mysql.sql`：在 MySQL 容器内通过 `mysqldump --single-transaction` 生成，并通过 `docker compose cp` 复制；
+- `assets/`：链接资产文件；
+- `capture-work/`：采集工作目录；
+- `manifest.json`：每个文件的相对路径、大小和 SHA-256。
+
+恢复脚本会先校验清单与全部文件哈希，再停止 backend、导入 SQL、替换两个数据目录并重启 backend。任一步失败时脚本非零退出；如果 backend 已经停止，会保持停止状态，避免部分恢复继续接收写入。
+
+脚本行为测试：
+
+```powershell
+node --test .\deploy\tests\backup-restore.test.mjs
+```
+
+独立验收栈在 M8.1/M8.2 中固定使用项目名 `webcollector-m8-acceptance` 和宿主机端口 `18080`。`deploy/.env` 的普通默认端口仍是 `8080`，验收启动时需要显式覆盖：
+
+```powershell
+$env:WEB_PORT = "18080"
+docker compose -p webcollector-m8-acceptance --env-file .\deploy\.env `
+  -f .\deploy\docker-compose.yml up -d --no-build
+```
 
 ## 真实 URL 验收
 
