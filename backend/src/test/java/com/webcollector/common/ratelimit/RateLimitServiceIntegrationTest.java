@@ -15,6 +15,10 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
 import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -34,6 +38,7 @@ class RateLimitServiceIntegrationTest {
 
     private RateLimitProperties properties;
     private RateLimitService service;
+    private MutableClock clock;
 
     @DynamicPropertySource
     static void registerContainerProperties(
@@ -48,10 +53,14 @@ class RateLimitServiceIntegrationTest {
         properties = RateLimitProperties.defaults();
         properties.getLogin().setLimit(2);
         properties.getLogin().setWindowSeconds(60);
+        clock = new MutableClock(
+                Instant.parse("2026-11-08T08:00:30Z"),
+                ZoneOffset.UTC
+        );
         service = new RateLimitService(
                 redisTemplate,
                 properties,
-                Clock.systemUTC()
+                clock
         );
     }
 
@@ -102,7 +111,7 @@ class RateLimitServiceIntegrationTest {
 
     // [测试意图] 验证固定窗口过期后同一 subject 可以重新获得完整额度。
     @Test
-    void shouldAllowAgainAfterFixedWindowExpires() throws InterruptedException {
+    void shouldAllowAgainAfterFixedWindowExpires() {
         properties.getLogin().setLimit(1);
         properties.getLogin().setWindowSeconds(1);
 
@@ -112,7 +121,7 @@ class RateLimitServiceIntegrationTest {
                 "expiring-subject"
         )).isInstanceOf(RateLimitedException.class);
 
-        Thread.sleep(1_100);
+        clock.advance(Duration.ofSeconds(1));
 
         service.requireAllowed(RateLimitScope.LOGIN, "expiring-subject");
     }
@@ -214,6 +223,35 @@ class RateLimitServiceIntegrationTest {
         Set<String> keys = redisTemplate.keys("webcollector:rate-limit:*");
         if (keys != null && !keys.isEmpty()) {
             redisTemplate.delete(keys);
+        }
+    }
+
+    private static final class MutableClock extends Clock {
+        private Instant instant;
+        private final ZoneId zone;
+
+        private MutableClock(Instant instant, ZoneId zone) {
+            this.instant = instant;
+            this.zone = zone;
+        }
+
+        private void advance(Duration duration) {
+            instant = instant.plus(duration);
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return zone;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return new MutableClock(instant, zone);
+        }
+
+        @Override
+        public Instant instant() {
+            return instant;
         }
     }
 }

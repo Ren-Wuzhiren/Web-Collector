@@ -10,7 +10,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -20,6 +24,9 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.Set;
 import java.util.UUID;
 
@@ -31,7 +38,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@Import(RateLimitEndpointIntegrationTest.FixedClockConfig.class)
 class RateLimitEndpointIntegrationTest {
+    private static final Instant FIXED_INSTANT =
+            Instant.parse("2026-11-08T08:00:30Z");
 
     @Autowired
     private MockMvc mockMvc;
@@ -205,6 +215,15 @@ class RateLimitEndpointIntegrationTest {
         Set<String> keys = redisTemplate.keys("webcollector:rate-limit:*");
         if (keys != null && !keys.isEmpty()) {
             redisTemplate.delete(keys);
+        }
+    }
+
+    @TestConfiguration(proxyBeanMethods = false)
+    static class FixedClockConfig {
+        @Bean
+        @Primary
+        Clock fixedRateLimitClock() {
+            return Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC);
         }
     }
 }
