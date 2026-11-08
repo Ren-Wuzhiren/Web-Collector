@@ -127,17 +127,18 @@ docker compose -p webcollector-m8-acceptance --env-file .\deploy\.env `
 
 ## 真实 URL 验收
 
-准备每行一个 URL 的文本文件，然后执行：
+使用版本化数据集执行；脚本会创建不带凭据输出的一次性账号：
 
 ```powershell
-.\scripts\accept-real-urls.ps1 `
-  -BaseUrl http://localhost:8080 `
-  -Username demo `
-  -Password "本地测试密码" `
-  -UrlsFile .\urls.txt
+pwsh -NoProfile -NonInteractive -File .\scripts\accept-real-urls.ps1 `
+  -BaseUrl http://127.0.0.1:18080 `
+  -DatasetFile .\scripts\acceptance\m9-real-urls.json `
+  -OutputFile .\data\acceptance\m9\results.json `
+  -JobTimeoutSeconds 300 `
+  -PollIntervalSeconds 3
 ```
 
-脚本输出每个 URL 的最终任务状态、耗时、错误和资产数量，并汇总成功率与中位耗时。
+脚本顺序提交 30 项，验证 `SUCCEEDED` 任务至少有一个资产可回读，输出逐项 JSON、成功率、中位耗时、三格式完整率和负向预期匹配率。JSON 位于被 `.gitignore` 忽略的 `data/` 下，不记录密码或 token。
 
 `local/` 仅用于开发机启动 MySQL/Redis；`reference/` 只用于 Linkwarden 上游研究，不进入自有项目部署。
 

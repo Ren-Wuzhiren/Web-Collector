@@ -1,0 +1,185 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "general-01",
+      "category": "baseline",
+      "url": "https://example.com",
+      "expectedOutcome": "CAPTURE_SUCCEEDED"
+    },
+    {
+      "id": "mdns-01",
+      "category": "English docs",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Overview",
+      "expectedOutcome": "CAPTURE_SUCCEEDED"
+    },
+    {
+      "id": "mdnz-01",
+      "category": "Chinese docs",
+      "url": "https://developer.mozilla.org/zh-CN/docs/Web/HTTP/Overview",
+      "expectedOutcome": "CAPTURE_SUCCEEDED"
+    },
+    {
+      "id": "mdnz-02",
+      "category": "Chinese docs",
+      "url": "https://developer.mozilla.org/zh-CN/docs/Web/HTTP/Cookies",
+      "expectedOutcome": "CAPTURE_SUCCEEDED"
+    },
+    {
+      "id": "mdnz-03",
+      "category": "Chinese docs",
+      "url": "https://developer.mozilla.org/zh-CN/docs/Web/HTTP/Guides/Caching",
+      "expectedOutcome": "CAPTURE_SUCCEEDED"
+    },
+    {
+      "id": "mdnz-04",
+      "category": "Chinese docs",
+      "url": "https://developer.mozilla.org/zh-CN/docs/Learn_web_development/Core/Scripting/What_is_JavaScript",
+      "expectedOutcome": "CAPTURE_SUCCEEDED"
+    },
+    {
+      "id": "mdn-01",
+      "category": "English docs",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CORS",
+      "expectedOutcome": "CAPTURE_SUCCEEDED"
+    },
+    {
+      "id": "spring-01",
+      "category": "product page",
+      "url": "https://spring.io/projects/spring-boot",
+      "expectedOutcome": "CAPTURE_SUCCEEDED"
+    },
+    {
+      "id": "spring-02",
+      "category": "framework docs",
+      "url": "https://docs.spring.io/spring-boot/reference/features/spring-application.html",
+      "expectedOutcome": "CAPTURE_SUCCEEDED"
+    },
+    {
+      "id": "spring-03",
+      "category": "framework docs",
+      "url": "https://docs.spring.io/spring-framework/reference/overview.html",
+      "expectedOutcome": "CAPTURE_SUCCEEDED"
+    },
+    {
+      "id": "blog-03",
+      "category": "technical blog",
+      "url": "https://spring.io/blog",
+      "expectedOutcome": "CAPTURE_SUCCEEDED"
+    },
+    {
+      "id": "github-02",
+      "category": "GitHub",
+      "url": "https://github.com/microsoft/playwright-java",
+      "expectedOutcome": "CAPTURE_SUCCEEDED"
+    },
+    {
+      "id": "github-03",
+      "category": "GitHub",
+      "url": "https://github.com/openai/openai-python",
+      "expectedOutcome": "CAPTURE_SUCCEEDED"
+    },
+    {
+      "id": "blog-01",
+      "category": "technical blog",
+      "url": "https://martinfowler.com/articles/microservices.html",
+      "expectedOutcome": "CAPTURE_SUCCEEDED"
+    },
+    {
+      "id": "blog-02",
+      "category": "Chinese blog",
+      "url": "https://www.liaoxuefeng.com/wiki/1252599548343744",
+      "expectedOutcome": "CAPTURE_SUCCEEDED"
+    },
+    {
+      "id": "images-01",
+      "category": "image-heavy",
+      "url": "https://commons.wikimedia.org/wiki/Featured_pictures",
+      "expectedOutcome": "CAPTURE_SUCCEEDED"
+    },
+    {
+      "id": "pdf-01",
+      "category": "direct PDF",
+      "url": "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
+      "expectedOutcome": "CAPTURE_SUCCEEDED"
+    },
+    {
+      "id": "image-01",
+      "category": "direct image",
+      "url": "https://media.w3.org/2010/05/sintel/poster.png",
+      "expectedOutcome": "CAPTURE_SUCCEEDED"
+    },
+    {
+      "id": "docs-01",
+      "category": "documentation",
+      "url": "https://docs.docker.com/get-started/",
+      "expectedOutcome": "CAPTURE_SUCCEEDED"
+    },
+    {
+      "id": "redirect-01",
+      "category": "redirect",
+      "url": "https://httpbingo.org/redirect/2",
+      "expectedOutcome": "CAPTURE_SUCCEEDED"
+    },
+    {
+      "id": "python-01",
+      "category": "English docs",
+      "url": "https://docs.python.org/3/tutorial/index.html",
+      "expectedOutcome": "CAPTURE_SUCCEEDED"
+    },
+    {
+      "id": "python-02",
+      "category": "Chinese docs",
+      "url": "https://docs.python.org/zh-cn/3/tutorial/index.html",
+      "expectedOutcome": "CAPTURE_SUCCEEDED"
+    },
+    {
+      "id": "postgres-01",
+      "category": "documentation",
+      "url": "https://www.postgresql.org/docs/current/index.html",
+      "expectedOutcome": "CAPTURE_SUCCEEDED"
+    },
+    {
+      "id": "html-01",
+      "category": "specification",
+      "url": "https://html.spec.whatwg.org/multipage/",
+      "expectedOutcome": "CAPTURE_SUCCEEDED"
+    },
+    {
+      "id": "http-403",
+      "category": "HTTP error page",
+      "url": "https://httpbingo.org/status/403",
+      "expectedOutcome": "CAPTURE_SUCCEEDED"
+    },
+    {
+      "id": "http-404",
+      "category": "HTTP error page",
+      "url": "https://httpbingo.org/status/404",
+      "expectedOutcome": "CAPTURE_SUCCEEDED"
+    },
+    {
+      "id": "failure-timeout",
+      "category": "timeout boundary",
+      "url": "https://1.1.1.1:81/",
+      "expectedOutcome": "CAPTURE_FAILED"
+    },
+    {
+      "id": "failure-redirect",
+      "category": "redirect limit",
+      "url": "https://httpbingo.org/redirect/11",
+      "expectedOutcome": "CAPTURE_FAILED"
+    },
+    {
+      "id": "failure-size",
+      "category": "response limit",
+      "url": "https://github.com/spring-projects/spring-boot",
+      "expectedOutcome": "CAPTURE_FAILED"
+    },
+    {
+      "id": "failure-ssrf",
+      "category": "metadata address",
+      "url": "http://169.254.169.254/latest/meta-data/",
+      "expectedOutcome": "CAPTURE_FAILED"
+    }
+  ]
+}
