@@ -10,8 +10,8 @@ import java.util.regex.Pattern;
 /**
  * 从 HTTP 请求提取不可伪造的客户端 IP。
  *
- * <p>生产实现只在直连来源属于可信代理时解析转发头，并从右向左
- * 跳过可信代理，返回第一个非可信地址。</p>
+ * <p>只有在直连来源属于可信代理时才读取转发头。可信代理提供的
+ * X-Real-IP 优先；缺失或非法时再从 X-Forwarded-For 右向左解析。</p>
  */
 public class ClientIpResolver {
     private static final Pattern IPV4_LITERAL =
@@ -36,6 +36,12 @@ public class ClientIpResolver {
 
         if (!isTrustedProxy(peer)) {
             return peer;
+        }
+
+        String realIp = normalize(request.getHeader("X-Real-IP"));
+
+        if (realIp != null) {
+            return realIp;
         }
 
         String forwardedFor = request.getHeader("X-Forwarded-For");
