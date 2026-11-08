@@ -14,6 +14,19 @@ docker compose --env-file deploy/.env -f deploy/docker-compose.yml ps
 
 首次创建账号后，把 `.env` 中的 `REGISTRATION_ENABLED` 改为 `false` 并重启 backend，避免公开部署时继续开放注册。
 
+限流默认策略：
+
+| 接口 | 默认额度 | subject |
+|---|---|---|
+| `POST /api/v1/auth/login` | 10 次 / 60 秒 | 可信客户端 IP |
+| `POST /api/v1/auth/register` | 5 次 / 600 秒 | 可信客户端 IP |
+| `POST /api/v1/links` | 30 次 / 60 秒 | 登录用户 ID |
+
+对应 `RATE_LIMIT_*_ENABLED`、`RATE_LIMIT_*_LIMIT` 和
+`RATE_LIMIT_*_WINDOW_SECONDS` 均可通过 `.env` 覆盖。Nginx 与 backend
+通过 Compose 私网通信，`RATE_LIMIT_TRUSTED_PROXY_CIDRS` 默认只信任
+Docker 私网；不要改成 `0.0.0.0/0`，否则客户端可以伪造转发地址。
+
 数据卷：
 
 - `mysql_data`：MySQL 数据。

@@ -30,6 +30,20 @@ logging:
 app:
   auth:
     registration-enabled: false
+  rate-limit:
+    login:
+      enabled: ${RATE_LIMIT_LOGIN_ENABLED:true}
+      limit: ${RATE_LIMIT_LOGIN_LIMIT:10}
+      window-seconds: ${RATE_LIMIT_LOGIN_WINDOW_SECONDS:60}
+    register:
+      enabled: ${RATE_LIMIT_REGISTER_ENABLED:true}
+      limit: ${RATE_LIMIT_REGISTER_LIMIT:5}
+      window-seconds: ${RATE_LIMIT_REGISTER_WINDOW_SECONDS:600}
+    create-link:
+      enabled: ${RATE_LIMIT_CREATE_LINK_ENABLED:true}
+      limit: ${RATE_LIMIT_CREATE_LINK_LIMIT:30}
+      window-seconds: ${RATE_LIMIT_CREATE_LINK_WINDOW_SECONDS:60}
+    trusted-proxy-cidrs: ${RATE_LIMIT_TRUSTED_PROXY_CIDRS:172.16.0.0/12}
   capture:
     worker-id: ${CAPTURE_WORKER_ID:capture-worker-local}
     lease-seconds: ${CAPTURE_LEASE_SECONDS:120}

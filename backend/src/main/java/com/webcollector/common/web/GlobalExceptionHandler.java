@@ -1,10 +1,12 @@
 package com.webcollector.common.web;
 
 import cn.dev33.satoken.exception.NotLoginException;
+import com.webcollector.common.ratelimit.RateLimitedException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -42,6 +44,26 @@ public class GlobalExceptionHandler {
                 ErrorCode.AUTH_REQUIRED.getDefaultMessage(),
                 Map.of()
         );
+    }
+
+    @ExceptionHandler(RateLimitedException.class)
+    public ResponseEntity<ErrorResponse> handleRateLimitedException(
+            RateLimitedException exception
+    ) {
+        ErrorCode errorCode = exception.getErrorCode();
+        ErrorResponse response = ErrorResponse.from(
+                errorCode,
+                exception.getMessage(),
+                exception.getDetails()
+        );
+
+        return ResponseEntity
+                .status(errorCode.getStatus())
+                .header(
+                        HttpHeaders.RETRY_AFTER,
+                        Long.toString(exception.getRetryAfterSeconds())
+                )
+                .body(response);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

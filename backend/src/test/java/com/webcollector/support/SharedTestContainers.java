@@ -45,5 +45,9 @@ public final class SharedTestContainers {
         registry.add("spring.data.redis.password", () -> "");
         // [测试隔离] 业务测试手动调用 Worker，避免后台调度消费夹具任务。
         registry.add("app.capture.scheduler-enabled", () -> "false");
+        // [测试隔离] 全量业务测试不复用真实限流窗口；限流由专门测试自行构造服务。
+        registry.add("app.rate-limit.login.enabled", () -> "false");
+        registry.add("app.rate-limit.register.enabled", () -> "false");
+        registry.add("app.rate-limit.create-link.enabled", () -> "false");
     }
 }

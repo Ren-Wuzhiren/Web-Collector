@@ -19,6 +19,10 @@ class ErrorCodeTest {
                 () -> assertEquals(HttpStatus.FORBIDDEN, ErrorCode.FORBIDDEN.getStatus()),
                 () -> assertEquals(HttpStatus.NOT_FOUND, ErrorCode.NOT_FOUND.getStatus()),
                 () -> assertEquals(HttpStatus.CONFLICT, ErrorCode.CONFLICT.getStatus()),
+                () -> assertEquals(
+                        HttpStatus.TOO_MANY_REQUESTS,
+                        ErrorCode.RATE_LIMITED.getStatus()
+                ),
                 () -> assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.INTERNAL_ERROR.getStatus()),
                 () -> assertEquals(HttpStatus.SERVICE_UNAVAILABLE, ErrorCode.SERVICE_UNAVAILABLE.getStatus()),
                 () -> assertEquals(HttpStatus.UNAUTHORIZED, ErrorCode.AUTH_REQUIRED.getStatus())

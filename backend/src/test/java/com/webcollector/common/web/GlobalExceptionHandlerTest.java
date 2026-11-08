@@ -1,6 +1,7 @@
 package com.webcollector.common.web;
 
 import cn.dev33.satoken.exception.NotLoginException;
+import com.webcollector.common.ratelimit.RateLimitedException;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -146,6 +147,19 @@ class GlobalExceptionHandlerTest {
                 .andExpect(jsonPath("$.requestId").value("req-handler-008"));
     }
 
+    // [测试意图] 验证限流异常返回 429、Retry-After 和统一 requestId，且不泄漏内部计数值。
+    @Test
+    void shouldMapRateLimitedExceptionToTooManyRequests() throws Exception {
+        mockMvc.perform(get("/test/rate-limited")
+                        .header(RequestIdFilter.REQUEST_ID_HEADER, "req-handler-009"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().string("Retry-After", "17"))
+                .andExpect(jsonPath("$.code").value("RATE_LIMITED"))
+                .andExpect(jsonPath("$.message").value("请求过于频繁，请稍后再试"))
+                .andExpect(jsonPath("$.details").isEmpty())
+                .andExpect(jsonPath("$.requestId").value("req-handler-009"));
+    }
+
     @RestController
     private static class TestController {
 
@@ -188,6 +202,11 @@ class GlobalExceptionHandlerTest {
                     "login",
                     NotLoginException.NOT_TOKEN
             );
+        }
+
+        @GetMapping("/test/rate-limited")
+        void throwRateLimited() {
+            throw new RateLimitedException(17);
         }
     }
 
