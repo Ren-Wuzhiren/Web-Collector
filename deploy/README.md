@@ -68,21 +68,47 @@ docker compose --env-file deploy/.env -f deploy/docker-compose.yml down
 node --test .\scripts\tests\seed-demo-account.test.mjs
 ```
 
-### 提升本地 demo 为运营管理员
+### 创建并保留正式管理员
 
-仅在需要检查 `/admin` 运营页时运行：
+正式实例先保持 `REGISTRATION_ENABLED=true`，在网页注册专用账号（默认约定为 `admin`）并设置高强度密码。
+
+随后从仓库根目录执行：
 
 ```powershell
-.\scripts\promote-demo-admin.ps1
+.\scripts\promote-admin.ps1 `
+  -Username admin `
+  -ComposeFile .\deploy\docker-compose.yml `
+  -EnvFile .\deploy\.env `
+  -ProjectName webcollector
 ```
 
-脚本只操作 `deploy/local/docker-compose.yml` 对应的本地 MySQL，把 `demo.role` 从 `USER` 提升为 `ADMIN`。重复运行是幂等的，未知账号会失败。数据库凭据由容器环境读取，脚本不会输出密码。角色每次请求都从数据库读取，因此现有登录会话不需要重新登录。
+脚本只把指定 Compose 项目中的 `USER` 提升为 `ADMIN`。重复运行是幂等的，未知账号、异常角色或错误项目会失败。数据库凭据由容器环境读取，脚本不会读取或输出账号密码；密码只以 BCrypt 哈希保存在 MySQL。
+
+确认 `/api/v1/auth/me` 返回 `role=ADMIN` 且 `/admin` 可访问后，把 `deploy/.env` 中的 `REGISTRATION_ENABLED` 改为 `false` 并重建 backend：
+
+```powershell
+docker compose -p webcollector --env-file .\deploy\.env `
+  -f .\deploy\docker-compose.yml up -d backend
+```
+
+管理员账号与角色保存在 `webcollector_mysql_data` 数据卷，现有备份的 `mysql.sql` 也包含 `app_user`。停止服务时只执行不带 `-v` 的 `docker compose down`；执行 `down -v` 会删除管理员、链接和资产。
+
+密码遗失时，临时重新开启注册，创建新的受控账号、提升为 ADMIN 并再次关闭注册。不要在长期运行的公开实例上保持注册开放。
+
+本地开发仍可使用兼容入口提升指定账号：
+
+```powershell
+.\scripts\promote-demo-admin.ps1 -Username demo
+```
+
+该入口固定操作 `deploy/local/docker-compose.yml`，不会误连正式实例。
 
 管理员可以查看跨账号聚合指标和失败任务元数据，包括用户名、来源域名、尝试次数和错误码；不能查看其他用户的完整 URL、标题、正文、错误原文或资产内容。管理员重试会创建新任务、清理旧失败任务的部分资产业务记录并写入持久审计。
 
-提升脚本测试：
+管理员脚本测试：
 
 ```powershell
+node --test .\scripts\tests\promote-admin.test.mjs
 node --test .\scripts\tests\promote-demo-admin.test.mjs
 ```
 

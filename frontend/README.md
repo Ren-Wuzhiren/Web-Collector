@@ -44,7 +44,19 @@ npm run test:e2e
 Pop-Location
 ```
 
-`npm run test:e2e` 先构建生产资源，再由 Playwright 自动启动 Spring Boot 和 Vite Preview。当前 31 项测试覆盖生产 Preview、真实双账号越权、非法 id、详情/正文/证据/标签/任务失败、401、`example.com` 保存与抓取、正文、三种证据、搜索、重新阅读、暗色/浅色主题、顶部导航、收藏网格/列表和管理员运营页。只有 MySQL `13307`、Redis `6380` 和外部网页访问可用时才能通过。
+`npm run test:e2e` 先构建生产资源，再由 Playwright 自动启动 Spring Boot 和 Vite Preview。当前 31 项测试覆盖生产构建资源、真实双账号越权、非法 id、详情/正文/证据/标签/任务失败、401、`example.com` 保存与抓取、正文、三种证据、搜索、重新阅读、暗色/浅色主题、顶部导航、收藏网格/列表和管理员运营页。只有 MySQL `13307`、Redis `6380` 和外部网页访问可用时才能通过。
+
+对已运行的正式 Compose 栈执行同一组浏览器验收：
+
+```powershell
+Push-Location frontend
+$env:E2E_BASE_URL = 'http://127.0.0.1:8080'
+$env:E2E_API_URL = 'http://127.0.0.1:8080'
+npm run test:e2e
+Pop-Location
+```
+
+设置 `E2E_BASE_URL` 后 Playwright 不启动本地后端和 Preview。测试允许正式栈使用不同端口，但仍会拒绝 Vite 的 `/@vite/client` 开发资源。
 
 管理员页面另有 7 项 Playwright 覆盖：普通用户不可见且不能直达、管理员概览与隐私字段、重试确认、游标加载更多、接口失败恢复、空状态和 1440/768/390 三档宽度。管理员身份由本地角色提升脚本准备，不使用固定管理员密码。
 

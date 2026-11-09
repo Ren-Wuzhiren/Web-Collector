@@ -13,7 +13,7 @@
 
     <groupId>com.webcollector</groupId>
     <artifactId>webcollector-backend</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.1.0</version>
     <name>webcollector-backend</name>
     <description>Web collecting and content saving system backend module</description>
 

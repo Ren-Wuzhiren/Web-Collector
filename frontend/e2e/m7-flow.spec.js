@@ -12,12 +12,14 @@ function createUniqueIdentity() {
   }
 }
 
-// [测试意图] 防止 E2E 误连 Vite 开发服务器，确保浏览器检查的是生产构建资源。
-test('浏览器 E2E 使用生产 Preview 而不是开发服务器', async ({
+// [测试意图] 防止 E2E 误连 Vite 开发服务器，同时允许外部 Compose 栈使用不同端口。
+test('浏览器 E2E 使用生产构建资源而不是开发服务器', async ({
   baseURL,
   page,
 }) => {
-  expect(baseURL).toBe('http://127.0.0.1:4173')
+  if (!process.env.E2E_BASE_URL) {
+    expect(baseURL).toBe('http://127.0.0.1:4173')
+  }
 
   await page.goto('/login')
   const scriptSources = await page
