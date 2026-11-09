@@ -140,5 +140,19 @@ pwsh -NoProfile -NonInteractive -File .\scripts\accept-real-urls.ps1 `
 
 脚本顺序提交 30 项，验证 `SUCCEEDED` 任务至少有一个资产可回读，输出逐项 JSON、成功率、中位耗时、三格式完整率和负向预期匹配率。JSON 位于被 `.gitignore` 忽略的 `data/` 下，不记录密码或 token。
 
+只补跑负向控制时，仍会完整校验 30 条数据集，但只提交选中的案例：
+
+```powershell
+pwsh -NoProfile -NonInteractive -File .\scripts\accept-real-urls.ps1 `
+  -BaseUrl http://127.0.0.1:18080 `
+  -DatasetFile .\scripts\acceptance\m9-real-urls.json `
+  -OutputFile .\data\acceptance\m9\negative-controls.json `
+  -JobTimeoutSeconds 300 `
+  -PollIntervalSeconds 3 `
+  -CaseId failure-timeout,failure-redirect,failure-size,failure-ssrf
+```
+
+该模式报告 `run.scope=SELECTED`，不能单独替代完整 30 项正向成绩；最终验收单需明确列出两轮证据来源。
+
 `local/` 仅用于开发机启动 MySQL/Redis；`reference/` 只用于 Linkwarden 上游研究，不进入自有项目部署。
 

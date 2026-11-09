@@ -548,3 +548,54 @@ test('records a duplicate rejection as a client error', async (t) => {
   assert.equal(report.cases[0].createHttpStatus, 409)
   assert.equal(report.cases[0].matched, false)
 })
+
+test('runs only selected case ids and scopes the summary to that selection', async (t) => {
+  const api = await startFakeApi()
+  t.after(() => api.close())
+  const dataset = await createDataset()
+  for (const item of dataset.cases.slice(26)) {
+    api.state.failedJobUrls.add(item.url)
+  }
+
+  const result = await runAcceptance(api, dataset, [
+    '-CaseId',
+    'case-27,case-28',
+  ])
+
+  assert.equal(result.code, 0, result.stderr)
+  const report = await readReport(dataset)
+  assert.equal(report.run.scope, 'SELECTED')
+  assert.deepEqual(report.run.selectedCaseIds, ['case-27', 'case-28'])
+  assert.deepEqual(report.cases.map((item) => item.id), ['case-27', 'case-28'])
+  assert.equal(report.summary.total, 2)
+  assert.equal(report.summary.positiveExpected, 0)
+  assert.equal(report.summary.negativeExpected, 2)
+  assert.equal(report.summary.negativeMatched, 2)
+  assert.equal(report.summary.passed, true)
+  assert.equal(
+    api.state.requests.filter(
+      (request) => request.method === 'POST' && request.path === '/api/v1/links',
+    ).length,
+    2,
+  )
+})
+
+test('rejects an unknown selected case id before creating links', async (t) => {
+  const api = await startFakeApi()
+  t.after(() => api.close())
+  const dataset = await createDataset()
+
+  const result = await runAcceptance(api, dataset, [
+    '-CaseId',
+    'missing-case',
+  ])
+
+  assert.notEqual(result.code, 0)
+  assert.match(`${result.stdout}\n${result.stderr}`, /missing-case/)
+  assert.equal(
+    api.state.requests.filter(
+      (request) => request.method === 'POST' && request.path === '/api/v1/links',
+    ).length,
+    0,
+  )
+})

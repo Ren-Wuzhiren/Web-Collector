@@ -22,7 +22,8 @@ param(
     [ValidateRange(1, 3600)]
     [int]$JobTimeoutSeconds = 300,
     [ValidateRange(1, 60)]
-    [int]$PollIntervalSeconds = 3
+    [int]$PollIntervalSeconds = 3,
+    [string[]]$CaseId = @()
 )
 
 $ErrorActionPreference = 'Stop'
@@ -91,6 +92,40 @@ function Import-AcceptanceDataset {
     return [pscustomobject]@{
         SchemaVersion = $dataset.schemaVersion
         Cases = $cases
+    }
+}
+
+function Select-AcceptanceCases {
+    param(
+        $Cases,
+        [string[]]$CaseIds
+    )
+
+    $normalizedIds = @(
+        $CaseIds |
+            ForEach-Object { $_ -split ',' } |
+            ForEach-Object { $_.Trim() } |
+            Where-Object { $_ } |
+            Sort-Object -Unique
+    )
+    if ($normalizedIds.Count -eq 0) {
+        return [pscustomobject]@{
+            Scope = 'FULL'
+            CaseIds = @()
+            Cases = @($Cases)
+        }
+    }
+
+    $knownIds = @($Cases | ForEach-Object id)
+    $unknownIds = @($normalizedIds | Where-Object { $_ -notin $knownIds })
+    if ($unknownIds.Count -gt 0) {
+        throw "未知的 CaseId：$($unknownIds -join ', ')"
+    }
+
+    return [pscustomobject]@{
+        Scope = 'SELECTED'
+        CaseIds = $normalizedIds
+        Cases = @($Cases | Where-Object { $_.id -in $normalizedIds })
     }
 }
 
@@ -560,11 +595,12 @@ function New-AcceptanceSummary {
     else {
         [math]::Round(100.0 * $expectedMatches / $Results.Count, 1)
     }
-    $passed = (
+    $positiveGate = $positive.Count -eq 0 -or (
         $successRate -ge 90 -and
-        $medianMs -le 30000 -and
-        $negativeMatches.Count -eq $negative.Count
+        $medianMs -le 30000
     )
+    $negativeGate = $negativeMatches.Count -eq $negative.Count
+    $passed = $positiveGate -and $negativeGate
 
     return [ordered]@{
         total = $Results.Count
@@ -589,11 +625,13 @@ function Invoke-Acceptance {
         [string]$DatasetFile,
         [string]$OutputFile,
         [int]$JobTimeoutSeconds,
-        [int]$PollIntervalSeconds
+        [int]$PollIntervalSeconds,
+        [string[]]$CaseId
     )
 
     $BaseUrl = Assert-LoopbackBaseUrl $BaseUrl
     $dataset = Import-AcceptanceDataset $DatasetFile
+    $selection = Select-AcceptanceCases -Cases $dataset.Cases -CaseIds $CaseId
     Assert-Ready $BaseUrl
 
     $startedAt = [DateTimeOffset]::UtcNow
@@ -604,7 +642,7 @@ function Invoke-Acceptance {
     }
 
     $results = [System.Collections.Generic.List[object]]::new()
-    foreach ($case in $dataset.Cases) {
+    foreach ($case in $selection.Cases) {
         Write-Host "[$($case.id)] $($case.url)"
         $result = Invoke-AcceptanceCase `
             -BaseUrl $BaseUrl `
@@ -634,6 +672,8 @@ function Invoke-Acceptance {
             datasetSchemaVersion = $dataset.SchemaVersion
             account = $session.Username
             commit = $commit
+            scope = $selection.Scope
+            selectedCaseIds = @($selection.CaseIds)
         }
         summary = $summary
         cases = $results.ToArray()
@@ -658,7 +698,8 @@ try {
         -DatasetFile $DatasetFile `
         -OutputFile $OutputFile `
         -JobTimeoutSeconds $JobTimeoutSeconds `
-        -PollIntervalSeconds $PollIntervalSeconds
+        -PollIntervalSeconds $PollIntervalSeconds `
+        -CaseId $CaseId
     exit $exitCode
 }
 catch {

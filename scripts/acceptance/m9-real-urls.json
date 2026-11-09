@@ -172,7 +172,7 @@
     {
       "id": "failure-size",
       "category": "response limit",
-      "url": "https://github.com/spring-projects/spring-boot",
+      "url": "https://proof.ovh.net/files/100Mb.dat",
       "expectedOutcome": "CAPTURE_FAILED"
     },
     {
